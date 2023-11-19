@@ -1,0 +1,3 @@
+[submodule "torchhd"]
+	path = torchhd
+	url = git@github.com:hyperdimensional-computing/torchhd.git
