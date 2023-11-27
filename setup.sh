@@ -13,9 +13,6 @@ else
     exit 1
 fi
 
-# Clone torchhd v5.0.1
-git clone
-
 # Create virtual environment and download packages
 python3 -m venv _venv
 source _venv/bin/activate
