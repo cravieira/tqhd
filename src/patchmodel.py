@@ -29,7 +29,7 @@ def patch_to_AMThermometerDeviation(am_class, args, am, **kwargs):
             am,
             bits=args.am_bits,
             intervals=args.am_intervals,
-            deviation=args.am_td_deviation,
+            deviation=args.am_tqhd_deviation,
             **kwargs,
         )
 
@@ -46,12 +46,11 @@ def patch_to_PQHDC(am_class, args, am, **kwargs):
             **kwargs
         )
 
-def transform_am(args):
+def transform_am(args, model):
     """docstring for transform_am"""
     if args.am_type not in patcheable_ams:
         raise RuntimeError(f'Attempt to patch AM to unsupported type {args.am_type}.')
 
-    model = common.load_model(args.model)
     if not isinstance(model.am, AMMap):
         raise RuntimeError('This script only works with AMMap models.')
 
@@ -69,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description='Model patcher.')
     parser.add_argument(
             'model',
-            help='Path to original model.',
+            help='path to original model.',
         )
     parser.add_argument(
             'path',
@@ -82,9 +81,9 @@ def main():
 
     # TODO: This script needs better arument parsing
     # Workaround the reuse of am_arguments in common.
-    model = None
+    model = common.load_model(args.model)
     if '--am-type' in sys.argv:
-        model = transform_am(args)
+        model = transform_am(args, model)
     elif '--am-prediction':
         prediction = common.args_pick_prediction(args)
         model = common.load_model(args.model)
