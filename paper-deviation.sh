@@ -63,7 +63,7 @@ function launch_hdc_table() {
                 local exp=$(parse_parameters ${table[i]})
                 local model_name="amtd-std$dev-bits$bits-d$dim"
                 local acc_file="$acc_dir/$model_name/$seed.acc"
-                echo py_launch "$cmd $exp $vsa $am_type --am-td-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
+                echo py_launch "$cmd $exp $vsa $am_type --am-tqhd-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
             done
         done
     done

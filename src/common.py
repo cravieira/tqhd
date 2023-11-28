@@ -3,14 +3,12 @@ from argparse import ArgumentParser
 from pathlib import Path
 import sys
 from typing import Callable, Optional
-from am.am import AMBsc, AMMap, AMSignQuantize, AMThermometerQuantile, AMThermometerDeviation, PQHDC
+from am.am import AMMap, AMSignQuantize, AMThermometerDeviation, PQHDC
 import torch
 import torchmetrics
-import torchhd
-from torchhd.functional import ensure_vsa_tensor, multibundle
 from tqdm import tqdm
 
-from am.learning import Centroid, OnlineHD
+from am.learning import Centroid
 from am.prediction import Fault, Normal
 
 _current_pytorch_device = "cpu"
@@ -105,7 +103,7 @@ def map_dtype(key: str):
 
 def add_default_hdc_arguments(parser: ArgumentParser):
     # Default HDC model tuning parameters
-    vsa_type = { 'MAP', 'BSC' }
+    vsa_type = { 'MAP' }
     default_vsa = 'MAP'
     default_dtype_enc = 'f32'
     default_dtype_am = 'f32'
@@ -159,7 +157,7 @@ def _float_range(mini, maxi):
 
 def add_am_arguments(parser: ArgumentParser):
     default_am = 'V'
-    am_types = ['V', 'Q', 'B', 'TQ', 'TD', 'SQ', 'PQHDC']
+    am_types = ['V', 'TQHD', 'SQ', 'PQHDC']
 
     group = parser.add_argument_group('Associative Memory', 'Allows for fine control of AM parameters.')
 
@@ -167,14 +165,7 @@ def add_am_arguments(parser: ArgumentParser):
             '--am-type',
             choices=am_types,
             default=default_am,
-            help='Chooses the AM type used. V is the regular AM, Q is a quantized MAP, and B is a MAP to BSC transformed vector.'
-            )
-    default_intervals = 4
-    group.add_argument(
-            '--am-intervals',
-            default=default_intervals,
-            type=int,
-            help=f'Choose the number of intervals used with Q, B, and T AMs. This argument is ignored with V AM. Defaults to {default_intervals}'
+            help='Chooses the AM type used. V is the regular AM, TQHD is the thermometer quantized, SQ is sig quantized, and PQHDC is projection based.'
             )
 
     default_bits = 8
@@ -182,42 +173,23 @@ def add_am_arguments(parser: ArgumentParser):
             '--am-bits',
             default=default_bits,
             type=int,
-            help=f'Choose the number of bits expansion used in AM B and T. Defaults to {default_bits}.'
+            help=f'Choose the number of bits expansion used in TQHD. Defaults to {default_bits}.'
             )
 
-    default_quantile = 0.25
+    default_intervals = default_bits+1
     group.add_argument(
-            '--am-tq-quantile',
-            default=default_quantile,
-            type=_float_range(0.0, 0.5),
-            help=f'Choose the default quantile evaluated when assigning the quantization poles used in AMTQuantile. Only float values between [0, 0.5] are accepted. Defaults to {default_quantile}.'
+            '--am-intervals',
+            default=default_intervals,
+            type=int,
+            help=f'Choose the number of intervals used with TQHD AMs. This argument is ignored for other AM types. Defaults to {default_intervals}'
             )
 
     default_deviation = 1.0
     group.add_argument(
-            '--am-td-deviation',
+            '--am-tqhd-deviation',
             default=default_deviation,
             type=_float_range(0.0, float('inf')),
-            help=f'Choose the multiplier used with the standard deviation when assigning the quantization poles of AMTDeviation. Only positve float values are accepted. Defaults to {default_deviation}.'
-            )
-
-    learning_types = ['Centroid', 'OnlineHD']
-    default_learning = 'Centroid'
-    group.add_argument(
-            '--am-learning',
-            default=default_learning,
-            choices=learning_types,
-            type=str,
-            help=f'Chooses the learning strategy used by the AM. Defaults to {default_learning}.'
-            )
-
-    # Learning rate used in OnlineHD
-    default_onlinehd_lr = 1.0
-    group.add_argument(
-            '--am-onlinehd-lr',
-            default=default_onlinehd_lr,
-            type=float,
-            help=f'Chooses the learning rate used by the OnlineHD strategy. Defaults to {default_onlinehd_lr}.'
+            help=f'Choose the multiplier used with the standard deviation when assigning the quantization poles of TQHD. Only positve float values are accepted. Defaults to {default_deviation}.'
             )
 
     prediction_types = ['Normal', 'Fault']
@@ -261,14 +233,7 @@ def args_pick_learning(args):
     """
     Get the learning strategy based on the argument parser.
     """
-    learning = None
-    if args.am_learning == 'Centroid':
-        learning = Centroid()
-    elif args.am_learning == 'OnlineHD':
-        lr = args.am_onlinehd_lr
-        learning = OnlineHD(lr)
-    else:
-        RuntimeError(f"Invalid learning strategy \"{args.am_learning}\"")
+    learning = Centroid()
 
     return learning
 
@@ -293,13 +258,7 @@ def pick_am_model(
     learning = None
     prediction = None
 
-    if am_learning == 'Centroid':
-        learning = Centroid()
-    elif am_learning == 'OnlineHD':
-        lr = kwargs['am_onlinehd_lr']
-        learning = OnlineHD(lr)
-    else:
-        RuntimeError(f"Invalid learning strategy \"{am_learning}\"")
+    learning = Centroid()
 
     if am_prediction == 'Normal':
         prediction = Normal()
@@ -309,17 +268,10 @@ def pick_am_model(
     if am_type == 'V':
         if vsa == 'MAP':
             am = AMMap(dim, num_classes, learning=learning, **kwargs)
-        else:
-            am = AMBsc(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
-    elif am_type == 'TQ':
+    elif am_type == 'TQHD':
         bits = kwargs['am_bits']
         intervals = kwargs['am_intervals']
-        quantile = kwargs['am_tq_quantile']
-        am = AMThermometerQuantile(dim, num_classes, bits, intervals, quantile, learning=learning, prediction=prediction, **kwargs)
-    elif am_type == 'TD':
-        bits = kwargs['am_bits']
-        intervals = kwargs['am_intervals']
-        deviation = kwargs['am_td_deviation']
+        deviation = kwargs['am_tqhd_deviation']
         am = AMThermometerDeviation(dim, num_classes, bits, intervals, deviation, learning=learning, prediction=prediction, **kwargs)
     elif am_type == 'SQ':
         am = AMSignQuantize(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
@@ -505,296 +457,3 @@ def args_test_hdc(args, model, test_ld, num_classes) -> Optional[float]:
     if args.skip_test:
         return None
     return test_hdc(model, test_ld, num_classes, device=args.device)
-
-# Math and transformations #
-def normalize(t, dtype=torch.get_default_dtype()):
-    # Normalize input
-    dot = torch.sum(t*t, dim=-1, dtype=dtype)
-    mag = torch.sqrt(dot)
-    # Adjust shape
-    mag = mag.unsqueeze(1)
-    #norm = t/mag
-    norm = torch.div(t, mag)
-
-    return norm
-
-def _create_poles(input: torch.Tensor, intervals, quantile=0.25):
-    """
-    Create quantization poles used by the AM object in its transformation
-    based on the input. This function assumes that the input is normalized.
-    """
-    # Create 1D tensor with quantization poles
-    # Start linspace at the furtherst quantile
-    qth = quantile
-    q = torch.tensor([qth, 1-qth])
-    q_vals = input.quantile(q)
-    # Pick the value furtherst from 0
-    start = torch.max(torch.abs(q_vals))
-    poles = torch.linspace(-start.item(), start.item(), steps=intervals)
-    return poles
-
-def _find_poles(input: torch.Tensor, poles: torch.Tensor):
-    """
-    Find the closest quantization pole to the given input. Returns a tensor
-    of indices to the closest poles.
-    """
-    # Make poles a tensor of [Intervals, 1, 1 ..., 1] depending on the
-    # shape of the input.
-    view = [1] *len(input.shape)
-    poles = poles.view(-1, *view)
-    # Get absolute difference to each pole
-    diffs = torch.abs(input - poles)
-    _, inds = torch.min(diffs, dim=0)
-    return inds
-
-def _map_to_binary_encoding(input: torch.Tensor, inds, table: torch.Tensor):
-    """
-    Map the given input to the encoding table according to inds.
-    """
-    input_dim = input.shape[-1]
-    table_entry_dim = table.shape[-1]
-    res = table[inds].view((-1, input_dim*table_entry_dim))
-    return res
-
-# Associative Memories #
-class AssociativeMemory():
-    """
-    Implements an Associative Memory for different VSA models and data
-    types.
-    """
-    def __init__(self, vsa, dtype):
-        super(AssociativeMemory, self).__init__()
-        self.vsa = vsa
-        self.dtype = dtype
-
-    def create_am(self, tensors):
-        # Achieves better accuracy with hard_quantize in encode. Only works
-        # with float
-        if self.dtype == torch.float32:
-            norms = tensors.norm(dim=1, keepdim=True)
-            eps=1e-12
-            norms.clamp_(min=eps)
-            norm = tensors.div(norms)
-        else:
-            # Provides worse accuracy
-            norm = tensors
-
-        self.am = ensure_vsa_tensor(norm, vsa=self.vsa, dtype=self.dtype)
-
-    def search(self, query):
-        """Search for the most similar entry in the AM for the given input."""
-        if self.vsa == 'MAP':
-            #logit = torchhd.dot_similarity(self.am, enc, dtype=self.dtype_am)
-            logit = torchhd.cosine_similarity(self.am, query)
-        else:
-            logit = torchhd.hamming_similarity(self.am, query)
-        return logit
-
-class AssociativeMemoryB():
-    """
-    Implements an Associative Memory that transforms MAP to BSC.
-    """
-    def __init__(self, intervals: int, bits: int, quantile=0.25):
-        super().__init__()
-        self.intervals = intervals
-        self.bits = bits
-        self.quantile = quantile
-        self.possible_encodings = bits//2 + 1
-        self.vsa = 'BSC'
-
-        if intervals >= self.possible_encodings:
-            raise RuntimeError(f'Number of intervals ({intervals}) is to big for the number of bits given ({bits}). Only {self.possible_encodings} are possible.')
-
-        # Create encodings
-        self.enc_table = self.encode_table(self.bits, self.intervals)
-        self.poles = None
-
-    def circulant(self, tensor, dim):
-        # Based on: https://stackoverflow.com/questions/69820726/is-there-a-way-to-compute-a-circulant-matrix-in-pytorch
-        """get a circulant version of the tensor along the {dim} dimension.
-
-        The additional axis is appended as the last dimension.
-        E.g. tensor=[0,1,2], dim=0 --> [[0,1,2],[2,0,1],[1,2,0]]"""
-        S = tensor.shape[dim]
-        flipped = tensor.flip((dim,))
-        tmp = torch.cat([flipped, torch.narrow(flipped, dim=dim, start=0, length=S-1)], dim=dim)
-        mat = tmp.unfold(dim, S, 1).flip((-1,))
-        return mat.squeeze_(0)
-
-    def encode_table(self, bits, entries):
-        # Create [1, 1, ..., 0, 0] pattern with equal numbers of 0's and 1's
-        pattern = torch.zeros((1, bits), dtype=torch.int)
-        pattern[..., :bits//2] = 1
-
-        # Create circular matrix
-        circular_mat = self.circulant(pattern, 1)
-
-        # Create bit wave pattern from circular matrix
-        possible_encodings = bits//2 + 1
-        wave_table = circular_mat[..., 0:possible_encodings, :]
-
-        # Remove middle entries
-        rows = entries//2 # Number of top and below rows used
-        top_rows = wave_table[..., 0:rows, :]
-        bot_rows = wave_table[..., -rows:, :]
-
-        # Create the final table without the rows in the middle
-        enc_table = torch.vstack([top_rows, bot_rows])
-        return enc_table
-
-    def _get_poles(self, input: torch.Tensor):
-        """
-        Return the poles tensor used by this AM. Creates the quantization poles
-        values if they do not exist yet based on the given input. Assumes the
-        input is normalized.
-        """
-        if self.poles is None:
-            self.poles = _create_poles(input, self.intervals, self.quantile)
-        return self.poles
-
-        # Alternative approach generating the quantizaiton poles to each input
-        #return self._create_poles(input, self.quantile)
-
-    def transform(self, input):
-        t = torchhd.functional.ensure_vsa_tensor(input, vsa='MAP', dtype=torch.float)
-        dtype = torch.float
-
-        norm = normalize(t, dtype=dtype)
-
-        poles = self._get_poles(norm)
-        inds = _find_poles(norm, poles)
-
-        # Create plain BSC vectors
-        res = _map_to_binary_encoding(norm, inds, self.enc_table)
-        return res
-
-    def create_am(self, tensors):
-        self.am = self.transform(tensors)
-
-    def search(self, query):
-        vector = self.transform(query)
-        logit = torchhd.hamming_similarity(self.am, vector)
-        return logit
-
-class AssociativeMemoryT():
-    """
-    Implements an Associative Memory that quantizes MAP to binary using
-    Thermometer enconding.
-    """
-    def __init__(self, intervals: int, bits: int, quantile=0.25):
-        super().__init__()
-        self.intervals = intervals
-        self.bits = bits
-        self.quantile = quantile
-        self.possible_encodings = bits + 1
-        self.vsa = 'BSC'
-
-        if intervals >= self.possible_encodings:
-            raise RuntimeError(f'Number of intervals ({intervals}) is to big for the number of bits given ({bits}). Only {self.possible_encodings} are possible.')
-
-        # Create encodings
-        #self.enc_table = self.encode_table(self.bits, self.intervals)
-        self.enc_table = self.encode_table(self.bits, self.intervals)
-        self.poles = None
-
-    def encode_table(self, bits, entries):
-        """
-        Create the encode table based on a Thermometer encoding.
-        """
-        all_combinations = bits+1
-        t = torchhd.thermometer(all_combinations, bits, vsa='BSC')
-
-        enc_table = t
-        # Remove middle entries if the number of required entries is less than
-        # the number of thermometer encodings available.
-        if entries < all_combinations:
-            rows = entries//2 # Number of top and below rows used
-            top_rows = t[..., 0:rows, :]
-            bot_rows = t[..., -rows:, :]
-
-            # Create the final table without the rows in the middle
-            enc_table = torch.vstack([top_rows, bot_rows])
-        # enc_table is a BSC vector and it cannot be used together with MAP,
-        # otherwise torchhd throws an exception when indexing. Convert the
-        # generated themometer table to MAP.
-        enc_table = torchhd.ensure_vsa_tensor(enc_table, vsa='MAP', dtype=torch.int32)
-        return enc_table
-
-    def _get_poles(self, input: torch.Tensor):
-        """
-        Return the poles tensor used by this AM. Creates the quantization poles
-        values if they do not exist yet based on the given input. Assumes the
-        input is normalized.
-        """
-        if self.poles is None:
-            self.poles = _create_poles(input, self.intervals, self.quantile)
-        return self.poles
-
-        # Alternative approach generating the quantizaiton poles to each input
-        #return self._create_poles(input, self.quantile)
-
-    def transform(self, input):
-        t = torchhd.functional.ensure_vsa_tensor(input, vsa='MAP', dtype=torch.float)
-        dtype = torch.float
-
-        norm = normalize(t, dtype=dtype)
-
-        poles = self._get_poles(norm)
-        inds = _find_poles(norm, poles)
-
-        # Create plain BSC vectors
-        res = _map_to_binary_encoding(norm, inds, self.enc_table)
-        return res
-
-    def create_am(self, tensors):
-        self.am = self.transform(tensors)
-
-    def search(self, query):
-        vector = self.transform(query)
-        logit = torchhd.hamming_similarity(self.am, vector)
-        return logit
-
-
-class AssociativeMemoryQ():
-    """
-    Implements an Associative Memory that quantizes the MAP vectors to a linspace.
-    """
-    def __init__(self, intervals: int):
-        super().__init__()
-        self.intervals = intervals
-        self.vsa = 'MAP'
-
-    def transform(self, input):
-        dtype = torch.float
-        t = torchhd.functional.ensure_vsa_tensor(input, vsa='MAP', dtype=dtype)
-
-        # Normalize input
-        norm = normalize(t, dtype=dtype)
-
-        # Find bit patterns
-        # Create 1D tensor with quantization poles
-        #poles = torch.linspace(-1, 1, steps=self.intervals)
-        poles = torch.linspace(-0.03, 0.03, steps=self.intervals)
-        # Make poles a tensor of [Intervals, 1, 1 ..., 1] depending on the
-        # shape of the input.
-        view = [1] *len(norm.shape)
-        poles = poles.view(-1, *view)
-        # Get absolute difference to each pole
-        diffs = torch.abs(norm - poles)
-        _, inds = torch.min(diffs, dim=0)
-
-        # Create plain BSC vectors
-        dim = input.shape[-1]
-        # Reshape poles to index inds
-        poles = poles.view(poles.shape[0])
-        res = poles[inds].view((-1, dim))
-        return res
-
-    def create_am(self, tensors):
-        self.am = self.transform(tensors)
-
-    def search(self, query):
-        vector = self.transform(query)
-        logit = torchhd.cosine_similarity(self.am, vector)
-        return logit
-

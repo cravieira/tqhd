@@ -11,7 +11,7 @@ import sys
 import common
 
 patcheable_ams = {
-        'TD': AMThermometerDeviation,
+        'TQHD': AMThermometerDeviation,
         'SQ': AMSignQuantize,
         'PQHDC': PQHDC,
         }

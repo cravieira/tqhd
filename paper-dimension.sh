@@ -65,28 +65,28 @@ function launch() {
 
 function voicehd() {
     local app="voicehd"
-    local acc_dir="$RESULT_DIR/$app/hdc/paper-dimension"
+    local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
     launch "src/voicehd_hdc.py" "$acc_dir" exp_table[@]
     echo "\n"
 }
 
 function emg() {
     local app="emg"
-    local acc_dir="$RESULT_DIR/$app/hdc/all/paper-dimension"
+    local acc_dir="$RESULT_DIR/$app/hdc/all/paper-tqhd"
     launch "src/emg.py" "$acc_dir" exp_table[@]
     echo "\n"
 }
 
 function mnist() {
     local app="mnist"
-    local acc_dir="$RESULT_DIR/$app/hdc/paper-dimension"
+    local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
     launch "src/mnist_hdc.py " "$acc_dir" exp_table[@]
     echo "\n"
 }
 
 function language() {
     local app="language"
-    local acc_dir="$RESULT_DIR/$app/hdc/paper-dimension"
+    local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
     launch "src/language.py " "$acc_dir" exp_table[@]
     echo "\n"
 }
