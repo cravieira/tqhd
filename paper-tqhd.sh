@@ -12,8 +12,9 @@ set -e
 source common.sh
 
 RESULT_DIR=_transformation # Result dir to be created
+POOL_DIR=_pool # Pool dir to be created
 MAX_SEED=20 # Max number of seeds evaluated
-JOBS=7 # Number of parallel jobs to be executed
+JOBS=15 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 start=1000
 step=1000
@@ -41,12 +42,26 @@ function parse_parameters() {
     echo "--am-intervals $ints --am-bits $bits"
 }
 
+# Create patch command if necessary.
+# $1: Model pool path
+# $2: Dimensions
+# $3: Seed
+function create_load_cmd() {
+    local pool_dir=$1
+    local dim=$2
+    local seed=$3
+
+    echo "--load-model $pool_dir/map/encf32-amf32/d$dim/$seed.pt --patch-model --skip-train"
+}
+
 #$1: Path to python script
 #$2: Output directory of the experiments
+#$3: Path to patched models dir
 function launch() {
     local cmd=$1
     local acc_dir=$2
     declare -a table=("${!3}")
+    local pool_dir=$4
 
     for (( seed = 0; seed < $MAX_SEED; seed++ )); do
         for dim in $dimensions ; do
@@ -58,7 +73,14 @@ function launch() {
                 local exp=$(parse_parameters ${table[i]})
                 local model_name="d$dim"
                 local acc_file="$acc_dir/b$bits/$model_name/$seed.acc"
-                echo py_launch "$cmd $exp $vsa $am_type --vector-size $dim --device $DEVICE --seed $seed --accuracy-file $acc_file"
+
+                # Create load command if there is a pool for this experiment
+                local load_cmd=""
+                if [ $pool_dir ]; then
+                    load_cmd=$(create_load_cmd $pool_dir $dim $seed)
+                fi
+
+                echo py_launch "$cmd $exp $load_cmd $vsa $am_type --vector-size $dim --device $DEVICE --seed $seed --accuracy-file $acc_file"
             done
         done
     done
@@ -67,7 +89,8 @@ function launch() {
 function voicehd() {
     local app="voicehd"
     local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
-    launch "src/voicehd_hdc.py" "$acc_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch "src/voicehd_hdc.py" "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
 }
 
@@ -81,14 +104,16 @@ function emg() {
 function mnist() {
     local app="mnist"
     local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
-    launch "src/mnist_hdc.py " "$acc_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch "src/mnist_hdc.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
 }
 
 function language() {
     local app="language"
-    local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
-    launch "src/language.py " "$acc_dir" exp_table[@]
+    local acc_dir="$RESULT_DIR/$app/hdc/map/paper-tqhd"
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch "src/language.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
 }
 

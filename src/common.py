@@ -7,6 +7,7 @@ from am.am import AMMap, AMSignQuantize, AMThermometerDeviation, PQHDC
 import torch
 import torchmetrics
 from tqdm import tqdm
+from patchmodel import transform_am
 
 from am.learning import Centroid
 from am.prediction import Fault, Normal
@@ -75,6 +76,12 @@ def add_default_arguments(parser: ArgumentParser):
             default=None,
             help='Load the trained model from the given path.'
             )
+
+    parser.add_argument('--patch-model',
+            default=False,
+            action='store_true',
+            help='Patch a loaded model.')
+
     parser.add_argument('--skip-train',
             action='store_true',
             default=False,
@@ -159,7 +166,7 @@ def add_am_arguments(parser: ArgumentParser):
     default_am = 'V'
     am_types = ['V', 'TQHD', 'SQ', 'PQHDC']
 
-    group = parser.add_argument_group('Associative Memory', 'Allows for fine control of AM parameters.')
+    group = parser.add_argument_group('Associative Memory', 'Allows fine control of AM parameters.')
 
     group.add_argument(
             '--am-type',
@@ -382,6 +389,9 @@ def args_pick_model(args, model_constructor: Callable):
     model = None
     if args.load_model:
         model = load_model(args.load_model)
+        if args.patch_model:
+            model = transform_am(args, model)
+
     else:
         model = model_constructor()
 
