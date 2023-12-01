@@ -6,7 +6,7 @@
 # experiment is to understand how the choice of the number of projections
 # affect the accuracy of the models.
 
-set -e
+set -eu
 
 source common.sh
 
@@ -32,7 +32,10 @@ PROJECTIONS=$(seq $start $step $stop)
 function launch() {
     local cmd=$1
     local acc_dir=$2
-    local pool_dir=$3
+    local pool_dir=""
+    if [[ $# -eq 3 ]]; then
+        pool_dir=$3
+    fi
 
     for (( seed = 0; seed < $MAX_SEED; seed++ )); do
         for dim in $DIMENSIONS ; do
@@ -41,6 +44,7 @@ function launch() {
                 am_type="--am-type PQHDC --am-pqhdc-projections $projection"
                 local model_name="p$projection/d$dim"
                 local acc_file="$acc_dir/$model_name/$seed.acc"
+                save_cmd=""
                 if [[ "$pool_dir" ]] ; then
                     local model_file="$"
                     save_cmd="--save-model $pool_dir/p$projection/d$dim/$seed.pt"
