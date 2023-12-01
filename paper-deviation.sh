@@ -15,6 +15,7 @@ set -eu
 source common.sh
 
 RESULT_DIR=_transformation # Result dir to be created
+POOL_DIR=_pool # Pool dir to be created
 MAX_SEED=20 # Max number of seeds evaluated
 JOBS=11 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
@@ -46,24 +47,49 @@ function parse_parameters() {
     echo "--vector-size $dim --am-intervals $ints --am-bits $bits"
 }
 
+# Create patch command if necessary.
+# $1: Model pool path
+# $2: Dimensions
+# $3: Seed
+function create_load_cmd() {
+    local pool_dir=$1
+    local dim=$2
+    local seed=$3
+
+    echo "--load-model $pool_dir/map/encf32-amf32/d$dim/$seed.pt --patch-model --skip-train"
+}
+
 #$1: Path to python script
 #$2: Output directory of the experiments
 #$3: Pointer to the parameter table
+#$4 (Optional): Path to pool dir
 function launch_hdc_table() {
     local cmd=$1
     local acc_dir=$2
     declare -a table=("${!3}")
+    local pool_dir=""
+    if [[ $# -eq 4 ]]; then
+        pool_dir=$4
+    fi
+
     for (( seed = 0; seed < $MAX_SEED; seed++ )); do
         for dev in $std_deviation ; do
             for (( i=0; i < ${#table[@]}; i++ )) ; do
                 vsa='--vsa MAP'
-                am_type='--am-type TD'
+                am_type='--am-type TQHD'
                 # Split the experiment table into its two variables
                 IFS=' ' read -r bits dim <<< ${table[i]}
                 local exp=$(parse_parameters ${table[i]})
                 local model_name="amtd-std$dev-bits$bits-d$dim"
                 local acc_file="$acc_dir/$model_name/$seed.acc"
-                echo py_launch "$cmd $exp $vsa $am_type --am-tqhd-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
+
+                # Create load command if there is a pool for this experiment
+                local load_cmd=""
+                if [ $pool_dir ]; then
+                    load_cmd=$(create_load_cmd $pool_dir $dim $seed)
+                fi
+
+                echo py_launch "$cmd $load_cmd $exp $vsa $am_type --am-tqhd-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
             done
         done
     done
@@ -72,7 +98,8 @@ function launch_hdc_table() {
 function voicehd() {
     local app="voicehd"
     local acc_dir="$RESULT_DIR/$app/hdc/deviation"
-    launch_hdc_table "src/voicehd_hdc.py" "$acc_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch_hdc_table "src/voicehd_hdc.py" "$acc_dir" exp_table[@]  "$pool_dir"
     echo "\n"
 }
 
@@ -86,14 +113,16 @@ function emg() {
 function mnist() {
     local app="mnist"
     local acc_dir="$RESULT_DIR/$app/hdc/deviation"
-    launch_hdc_table "src/mnist_hdc.py " "$acc_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch_hdc_table "src/mnist_hdc.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
 }
 
 function language() {
     local app="language"
     local acc_dir="$RESULT_DIR/$app/hdc/deviation"
-    launch_hdc_table "src/language.py " "$acc_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app/hdc"
+    launch_hdc_table "src/language.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
 }
 
@@ -107,8 +136,3 @@ cmd+=$(language)
 #printf "$cmd"
 printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
 disable_venv
-
-# Export generated directory to the project's root folder so that other parts
-# of the repository can access it.
-#ln -fs ./train/$RESULT_DIR ../
-
