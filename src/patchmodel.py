@@ -58,10 +58,15 @@ def transform_am(args, model):
 
     target_class = patcheable_ams[args.am_type]
     prediction = common.args_pick_prediction(args)
-    new_am = patch_to(target_class, args, model_am, prediction=prediction)
+    # Only transform AM type if they are not the same type
+    if target_class is not type(model_am):
+        new_am = patch_to(target_class, args, model_am, prediction=prediction)
+    # If they are, change only the prediction strategy
+    else:
+        new_am = model_am
+        new_am.prediction = prediction
 
     model.am = new_am
-
     return model
 
 def main():
