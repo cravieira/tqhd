@@ -20,7 +20,6 @@ start=1000
 step=1000
 final=10000
 dimensions=$(seq $start $step $final)
-#std_deviation=$(seq -w $start $step $final | sed 's/,/./')
 
 # <Bits>
 exp_table=(
@@ -57,6 +56,7 @@ function create_load_cmd() {
 #$1: Path to python script
 #$2: Output directory of the experiments
 #$3: Path to patched models dir
+#$4: Path to pool dir
 function launch() {
     local cmd=$1
     local acc_dir=$2
