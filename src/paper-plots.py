@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import argparse
 from typing import List
 from cycler import cycler
 from functools import partial
@@ -21,7 +20,7 @@ import re
 import pandas as pd
 
 # Plots imports
-from src import plot
+from plot import plot
 
 # Models imports
 # Hack to solver imports
@@ -32,12 +31,6 @@ import voicehd_hdc as voicehd
 
 APP_NAME_STYLE = dict(
             fontstyle='oblique',
-            ## Draw the bounding box
-            #bbox=dict(
-            #    boxstyle='round',
-            #    ec='#f2f2f2ff',
-            #    fc='#ffffffff'
-            #    )
         )
 
 def make_latex_equation(t: str) -> str:
@@ -154,7 +147,6 @@ def figure_histogram(data, sty, legends=None, **kwargs):
 
         ax.text(0.95, 0.9,
                 f"$\sigma={sigma:.4f}$",
-                #size='small',
                 ha='right',
                 va='top',
                 transform=ax.transAxes,
@@ -162,10 +154,6 @@ def figure_histogram(data, sty, legends=None, **kwargs):
 
         # Fix y limits of all axis to make them look nicer in the final Figure
         ax.set_ylim(ymax=0.6)
-
-    # Set the ticks and ticklabels for all axes
-    #plt.setp(axs, xticks=x_range, xticklabels=x_ticks_labels,
-    #    )
 
     ax.plot([], [], '--', color='black', label='PDF')
     # Hack to make the legend box not appear in front of the toppest plots. I
@@ -175,13 +163,11 @@ def figure_histogram(data, sty, legends=None, **kwargs):
 
     fig.supxlabel(r'Value ($\sigma$)')
     fig.supylabel('Probability Density')
-    #ax.set_title('Probability Densities of Normalized Vectors')
     ax.set_axisbelow(True)
     ax.grid(visible=True)
     plt.tight_layout()
 
     #plt.show()
-    #import sys; sys.exit(0)
     plot._plot(**kwargs)
 
 def figure_normal_distribution():
@@ -189,7 +175,7 @@ def figure_normal_distribution():
     device = 'cpu'
     common.set_random_seed(0)
 
-    train_ld, test_ld = voicehd.load_dataset('_data')
+    train_ld, _ = voicehd.load_dataset('_data')
     num_classes = len(train_ld.dataset.classes)
     entry_size = len(train_ld.dataset[0][0])
     LEVELS = 10
@@ -552,9 +538,9 @@ def figure_error_deviation():
         bit_dir_grouped = [list(experiment_path.glob(f'./*{bit}*')) for bit in bits_experimented]
 
         # Ensure all experiments executed for each bit are sorted so that dev 0.5
-        # comes before dev 0.6, for example. This variable is a list of lists. The
-        # first dimension is equal to the number of shapes and the second dimension
-        # is a list of paths to each standard deviation experimented.
+        # comes before dev 0.6, for example. The variable below is a list of lists. The
+        # first dimension is equal to the number of shapes and the second is a
+        # list of paths to each standard deviation experimented.
         bit_dir_grouped = [natsort.humansorted(i) for i in bit_dir_grouped]
 
         # This variable is a list of lists of numpy arrays. [<bits>, <std dev>, <seed>].
@@ -817,10 +803,8 @@ def figure_dimension():
         reference_models = reference_path.glob(f'./{reference_model}*')
         reference_models = natsort.humansorted(reference_models)
         reference_accs = list(map(parse_accuracy_directory, reference_models))
-        seeds_in_accs = all_accs.shape[-1]
-        # Reshape reference_acc if it has been executed with more seeds
-        reference_accs = [acc[0:seeds_in_accs] for acc in reference_accs]
         reference_accs = np.vstack(reference_accs)
+        seeds_in_accs = all_accs.shape[-1]
 
         # Parse signquantized values
         sq_accs = _parse_results_sorted(sq_path)
@@ -1242,14 +1226,14 @@ def figure_tqhd_vs_pqhdc():
     # Parse TQHD
     losses_tqhd = []
     for app in apps:
-        acc_path = f'_transformation/{app}/hdc/paper-dimension'
+        acc_path = f'_transformation/{app}/hdc/paper-tqhd'
         ref_path = f'_accuracy/{app}/hdc'
         loss = _parse_app(acc_path, ref_path)
         losses_tqhd.append(loss)
 
     app = 'emg'
     loss = _parse_app(
-            f'_transformation/{app}/hdc/all/paper-dimension',
+            f'_transformation/{app}/hdc/all/paper-tqhd',
             f'_accuracy/{app}/hdc/all'
             )
     losses_tqhd.append(loss)
@@ -1412,13 +1396,14 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    figure_normal_distribution()
     #figure_intervals_bits()
     #figure_error_deviation()
+
+    #figure_normal_distribution()
     #figure_dimension()
     #figure_compaction()
-    #figure_tqhd_vs_pqhdc()
-    #figure_noise()
+    figure_tqhd_vs_pqhdc()
+    figure_noise()
 
 if __name__ == '__main__':
     main()
