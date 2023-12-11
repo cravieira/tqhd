@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-from typing import List
 from cycler import cycler
 from functools import partial
 import matplotlib.pyplot as plt
@@ -96,8 +95,6 @@ def figure_histogram(data, sty, legends=None, **kwargs):
         x_norm = x / np.linalg.norm(x)
         sigma = np.std(x_norm)
 
-        print(sigma)
-        mu = np.mean(x_norm) # Mean of distribution
         sigma = np.std(x_norm) # Standard deviation of distribution
 
         # Create x_ticks related to the standard deviation
@@ -171,7 +168,6 @@ def figure_histogram(data, sty, legends=None, **kwargs):
     plot._plot(**kwargs)
 
 def figure_normal_distribution():
-    app = 'voicehd'
     device = 'cpu'
     common.set_random_seed(0)
 
@@ -185,7 +181,6 @@ def figure_normal_distribution():
     am_type = 'V'
     models = []
     dims = [1000, 10000]
-    #dims = [100, 100]
     for dim in dims:
         model = voicehd.VoiceHD_HDC(
                 dim,
@@ -229,9 +224,7 @@ def figure_normal_distribution():
     #color_cycle = cycler(color=plt.rcParams['axes.prop_cycle'][:4])
     colors = ['#629fca', '#ffa556', '#6bbc6b', '#e26768',]
     color_cycle = cycler(color=colors)
-    #label_cycle = cycler(label=[f'set {n}' for n in range(4)])
     label_cycle = cycler(label=legends)
-    #label_cycle = cycler(label=[f'set {n}' for n in range(4)])
 
     name='probability-density'
     figure_histogram(
@@ -240,51 +233,12 @@ def figure_normal_distribution():
             legends=legends,
             path=f'_plots/{name}.pdf'
             )
-    #figure_histogram(
-    #        data,
-    #        sty=color_cycle+label_cycle,
-    #        legends=legends,
-    #        path=f'_plots/{name}.png'
-    #        )
-
-def plot_intervals_bits(data: List, labels: List[str], titles=List[str], **kwargs):
-    '''
-    Create the boxplots of the experiment varying the number of intervals and
-    bits.
-    '''
-    ax_size = len(data)
-    cm = 1/2.54  # centimeters in inches
-    IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
-    fig, axs = plt.subplots(
-            nrows=ax_size,
-            ncols=1,
-            sharex=True,
-            figsize=(IEEE_column_width*2, IEEE_column_width*3)
+    figure_histogram(
+            data,
+            sty=color_cycle+label_cycle,
+            legends=legends,
+            path=f'_plots/{name}.png'
             )
-
-    for d, ax, title in zip(data, axs, titles):
-        bplot = ax.boxplot(
-                d,
-                vert=True,
-                labels=labels,
-                showmeans=True,
-            )
-
-        # Place application name at the right of the axis
-        ax.yaxis.set_label_position('right')
-        ax.set_ylabel(
-            title,
-            rotation=270,
-            rotation_mode='anchor',
-            verticalalignment="bottom",
-        )
-
-
-    fig.supylabel('Accuracy Loss in pp')
-    plt.xticks(rotation=90)
-
-    plt.tight_layout()
-    plot._plot(**kwargs)
 
 def parse_accuracy_file(p: Path):
     with open(p) as f:
@@ -302,7 +256,6 @@ def parse_accuracy_directory(p: Path):
 def get_sorted_subfolders(p: Path):
     p = Path(p)
     objs = p.glob('./*')
-    #dirs = [obj for obj in objs if obj.is_dir]
     dirs = filter(Path.is_dir, objs)
     sorted_dirs = natsort.humansorted(dirs)
     return sorted_dirs
@@ -323,98 +276,6 @@ def map_sorted_subfiles(p: Path, f):
     files = [obj for obj in objs if obj.is_file]
     sorted_dirs = natsort.humansorted(files)
     return map(f, sorted_dirs)
-
-def sort_experiments(accs, labels):
-    keys = [
-        'ints2-bits2',
-        'ints3-bits2',
-        'ints4-bits3',
-        'ints4-bits4',
-        'ints5-bits4',
-        'ints4-bits5',
-        'ints6-bits5',
-        'ints4-bits6',
-        'ints6-bits6',
-        'ints7-bits6',
-        'ints4-bits7',
-        'ints6-bits7',
-        'ints8-bits7',
-        ]
-
-    sorted_accs = []
-    for key in keys:
-        pair = zip(accs, labels)
-        val = next(acc for acc, label in pair if key in label)
-        sorted_accs.append(val)
-
-    return sorted_accs, keys
-
-def parse_app_results(experiment_path: Path, reference_path: Path):
-    '''
-    Parse all results of a given application and return the accuracy difference
-    to the reference model. Returns a numpy array that can be readily used in
-    boxplot and the labels found.
-    '''
-    # Get accuracy files
-    ints_bits_dirs = list(experiment_path.glob('./*'))
-    ints_bits_labels = [str(dir.stem+dir.suffix) for dir in ints_bits_dirs]
-    experiment_accs = map(parse_accuracy_directory, ints_bits_dirs)
-
-    # Sort accuracys and labels
-    experiment_accs = list(experiment_accs)
-
-    # Custom directory sort to make data comparison easier
-    experiment_accs, experiment_labels = sort_experiments(experiment_accs, ints_bits_labels)
-
-    experiment_accs = np.array(experiment_accs)
-
-    reference_acc = parse_accuracy_directory(reference_path)
-
-    # Reshape reference_acc if it has been executed with more seeds
-    reference_acc = reference_acc[0:experiment_accs.shape[1]]
-
-    data = reference_acc - experiment_accs
-    labels = experiment_labels
-
-    data = data.transpose()
-
-    return data, labels
-
-def figure_intervals_bits():
-    '''
-    Plot the variation of intervals and bits.
-    '''
-    apps = ['voicehd', 'mnist', 'language']
-    experiment_paths = []
-    reference_model_paths = []
-    for app in apps:
-        experiment_paths.append(Path(f'_transformation/{app}/hdc/paper-int-bits'))
-        reference_model_paths.append(Path(f'_accuracy/{app}/hdc/map-encf32-amf32-d1000'))
-
-    # Handle the EMG dataset since it has different subjects
-    app = 'emg'
-    experiment_paths.append(Path(f'_transformation/{app}/hdc/all/paper-int-bits'))
-    reference_model_paths.append(Path(f'_accuracy/{app}/hdc/all/map-encf32-amf32-d1000'))
-
-    # Parse data
-    data = []
-    labels = None
-    for exp_path, ref_path in zip(experiment_paths, reference_model_paths):
-        accs, labels = parse_app_results(exp_path, ref_path)
-        data.append(accs)
-
-    all_apps = [*apps, 'emg']
-
-    replace_bits = partial(str_replace, pattern='bits', to='B')
-    replace_intervals = partial(str_replace, pattern='ints', to='I')
-    remove_dash = partial(str_replace, pattern='-', to='')
-    labels = map(replace_bits, labels)
-    labels = map(replace_intervals, labels)
-    labels = map(remove_dash, labels)
-    labels = list(map(make_latex_equation, labels))
-
-    plot_intervals_bits(data, labels=labels, titles=all_apps, path='_plots/acc_error.pdf')
-    plot_intervals_bits(data, labels=labels, titles=all_apps, path='_plots/acc_eror.png')
 
 def extract_substring(regular_exp, string: str) -> str:
     match = regular_exp.search(string)
@@ -516,7 +377,6 @@ def plot_deviation(data, dev_range, apps, labels, hline=None, **kwargs):
     plt.tight_layout()
     plot._plot(**kwargs)
 
-
 def figure_error_deviation():
     """
     Plot the error to the baseline when varying the standard deviation used.
@@ -566,9 +426,6 @@ def figure_error_deviation():
 
         return data, bits_experimented, sq_loss_mean
 
-    #app = 'voicehd'
-    #experiment_path = Path(f'_transformation/{app}/hdc/deviation')
-    #bit_accs, labels = _parse_app_results(experiment_path)
     apps = ['voicehd', 'mnist', 'language']
     experiment_paths = []
     reference_model_paths = []
@@ -685,17 +542,12 @@ def figure_error_deviation():
         print('In the paper, we claim that choosing B>4 result in diminishing gains')
         print(diff_bits)
 
-        #claim_data = b2_data[:, ind_1]
-        #best_data = np.min(b2_data, axis=-1)
-
-
     # Find biggest mean between best choice of P and 1.0
-    #_find_max_diff(data)
+    _find_max_diff(data)
     _find_p1_progression(data)
 
 def plot_dimension(data, dim_range, apps, labels, sq_loss, **kwargs):
-    """docstring for plot_deviation"""
-    ax_size = len(data)
+    """docstring for plot_dimension"""
     cm = 1/2.54  # centimeters in inches
     IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
     fig, axs = plt.subplots(
@@ -769,137 +621,7 @@ def plot_dimension(data, dim_range, apps, labels, sq_loss, **kwargs):
     plt.tight_layout()
     plot._plot(**kwargs)
 
-def figure_dimension():
-    """
-    Plot the error to the baseline when varying the dimension
-    """
-    def _parse_results_sorted(experiment_path, functor=parse_accuracy_directory):
-        all_dirs = list(experiment_path.glob('./*'))
-        sorted_dirs = natsort.humansorted(all_dirs)
-
-        results = map(functor, sorted_dirs)
-        results = np.array(list(results))
-
-        return results
-
-    def _parse_bit_dir(experiment_path):
-        accs = _parse_results_sorted(experiment_path, functor=parse_accuracy_directory)
-        return accs
-
-    def _parse_app_results(experiment_path, reference_path, sq_path, reference_model):
-        """
-        Parse the results and return the accuracy loss of quantization
-        experiment compared to the reference model.
-        """
-        all_bits_dirs = list(experiment_path.glob('./*'))
-        all_bits_dirs = natsort.humansorted(all_bits_dirs)
-        labels = [d.stem for d in all_bits_dirs]
-        all_accs = map(_parse_bit_dir, all_bits_dirs)
-
-        all_accs = np.array(list(all_accs))
-
-        # Parse reference
-        # Get all dimensions available for given reference model
-        reference_models = reference_path.glob(f'./{reference_model}*')
-        reference_models = natsort.humansorted(reference_models)
-        reference_accs = list(map(parse_accuracy_directory, reference_models))
-        reference_accs = np.vstack(reference_accs)
-        seeds_in_accs = all_accs.shape[-1]
-
-        # Parse signquantized values
-        sq_accs = _parse_results_sorted(sq_path)
-
-        data = np.subtract(reference_accs, all_accs)
-        sq_data = np.subtract(reference_accs, sq_accs)
-
-        return data, labels, sq_data
-
-    apps = ['voicehd', 'mnist', 'language']
-    experiment_paths = []
-    reference_model_paths = []
-    signquantize_paths = []
-    reference_model = 'map-encf32-amf32-'
-    for app in apps:
-        experiment_paths.append(Path(f'_transformation/{app}/hdc/paper-dimension'))
-        signquantize_paths.append(Path(f'_transformation/{app}/hdc/signquantize'))
-        reference_model_paths.append(Path(f'_accuracy/{app}/hdc'))
-
-    # Handle the EMG dataset since it has different subjects
-    app = 'emg'
-    experiment_paths.append(Path(f'_transformation/{app}/hdc/all/paper-dimension'))
-    signquantize_paths.append(Path(f'_transformation/{app}/hdc/all/signquantize'))
-    reference_model_paths.append(Path(f'_accuracy/{app}/hdc/all'))
-    apps.append(app)
-
-    # Parse data to be plotted. Data is a list of list of numpy arrays.
-    # dim 0: Applications evaluated
-    # dim 1: Bit experiments executed in this application
-    # dim 2: A 2D numpy tensor in the shape [std_deviation, seed]
-    data = []
-    sq_losses = []
-    labels = None
-    for exp_path, ref_path, sq_path in zip(experiment_paths, reference_model_paths, signquantize_paths):
-        accs, labels, sq_loss = _parse_app_results(exp_path, ref_path, sq_path, reference_model)
-        data.append(accs)
-        sq_losses.append(sq_loss)
-
-    # Plot #
-    # Create plotted range
-    start = 1000
-    stop = 10000
-    step = 1000
-    dim_range = np.arange(start, stop+step, step)
-
-    # Use latex notation on legend. The legend must be something like "$B1$".
-    replace_bits = partial(str_replace, pattern='b', to='B')
-    labels = map(replace_bits, labels)
-    labels = list(map(make_latex_equation, labels))
-
-    # Allow global function to select only a subset of the experimented bits in
-    # TQHD.
-    data, labels = select_bits(data, labels)
-
-    plot_dimension(
-        data,
-        dim_range,
-        apps,
-        labels=labels,
-        sq_loss=sq_losses,
-        path='_plots/error_dimension.pdf'
-    )
-    #plot_deviation(
-    #    data,
-    #    dev_range,
-    #    apps,
-    #    labels=labels,
-    #    hline=sq_losses,
-    #    path='_plots/error_dimension.png'
-    #)
-
-def plot_compaction(data, dim_range, reference_data=None):
-    ax_size = len(data)
-    cm = 1/2.54  # centimeters in inches
-    IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
-    fig, axs = plt.subplots(
-            nrows=1,
-            ncols=1,
-            #sharex=True,
-            figsize=(IEEE_column_width*2.5, IEEE_column_width*2)
-            )
-
-    if reference_data is None:
-        reference_data = [None] * len(data)
-
-    for data_curve in data:
-        axs.plot(dim_range, data_curve)
-
-    if reference_data is not None:
-        for curve in reference_data:
-            axs.plot(dim_range, curve)
-
-    plot._plot()
-
-def parse_compaction_app(app_dir: str, dim_range, curves):
+def parse_compaction_app(app_dir: str, dim_range, configs):
     def _parse_csv(path: Path):
         data = pd.read_csv(path)
         return data
@@ -929,19 +651,6 @@ def parse_compaction_app(app_dir: str, dim_range, curves):
 
     df = _parse_all(app_dir)
 
-    #def _calc_compacted_size(df, keys, dimensions):
-    #    compaction_bits = int(keys[1])
-    #    query_df = df.query(f'tqhd_b == {keys[0]} & comp_c == {keys[1]}')
-
-    #    means = []
-    #    for d in dimensions:
-    #        comp_elem = query_df.query(f'map_dim == {d}')['comp_elems']
-    #        mean = np.mean(comp_elem.to_numpy())
-    #        means.append(mean)
-
-    #    compacted_size = np.array(means, dtype=np.int64) * compaction_bits
-    #    return compacted_size
-
     # New version #
     # Use information in CSV
     def _calc_compacted_size_improvement(df, keys, dimensions):
@@ -955,12 +664,11 @@ def parse_compaction_app(app_dir: str, dim_range, curves):
         return improvement
 
     # Create partial function with closure
-    #calc_compacted_size = lambda keys: _calc_compacted_size(df, keys, dim_range)
     calc_compacted_improvement = lambda keys: _calc_compacted_size_improvement(df, keys, dim_range)
-    compacted_sizes = list(map(calc_compacted_improvement, curves))
+    compacted_sizes = list(map(calc_compacted_improvement, configs))
     compacted_improvement = np.array(compacted_sizes)
 
-    return (1-compacted_improvement)
+    return 1-compacted_improvement
 
 def figure_compaction():
     # Create plotted range
@@ -968,33 +676,10 @@ def figure_compaction():
     stop = 10000
     step = 1000
     dim_range = np.arange(start, stop+step, step)
-    #roof_data = [
-    #        #dim_range*2,
-    #        dim_range*3,
-    #        #dim_range*2,
-    #        #dim_range*2,
-    #        ]
-    #roof_data = [
-    #        dim_range*3,
-    #        dim_range*3,
-    #        dim_range*3,
-    #        dim_range*4,
-    #        dim_range*4,
-    #        dim_range*5,
-    #        dim_range*6,
-    #        dim_range*7,
-    #        dim_range*8,
-    #        ]
-    #roof_data = np.vstack(roof_data)
-    #voicehd_classes = 26
-    #roof_data *= voicehd_classes
 
-    curves = [
+    configs = [
             # <bits> <compaction-bits>
-            #['2', '2'], # Commented out since it does no provide benefits
-            #['3', '2'],
             ['3', '3'],
-            #['3', '4'],
             ['4', '3'],
             ['4', '4'],
             ['5', '4'],
@@ -1007,14 +692,14 @@ def figure_compaction():
     compaction_rates = []
     for app in apps:
         path = f'_transformation/{app}/hdc/compaction/tqhd'
-        compaction_rate = parse_compaction_app(path, dim_range, curves)
+        compaction_rate = parse_compaction_app(path, dim_range, configs)
         compaction_rates.append(compaction_rate)
 
     # Parse all EMG's datasets
     emg_rates = []
     for i in range(5):
         path = f'_transformation/emg-s{i}'
-        compaction_rate = parse_compaction_app(path, dim_range, curves)
+        compaction_rate = parse_compaction_app(path, dim_range, configs)
         emg_rates.append(compaction_rate)
     emg_rates = np.mean(emg_rates, axis=0)
 
@@ -1028,7 +713,7 @@ def figure_compaction():
     table = np.transpose(np.vstack((compaction_rates, means)))
 
     headers = [*apps, 'mean']
-    config_labels = [f'$B{b}C{c}$' for b, c in curves]
+    config_labels = [f'$B{b}C{c}$' for b, c in configs]
     configs_df = pd.DataFrame({'config': config_labels})
 
     table_df = pd.DataFrame(data=table, columns=headers)
@@ -1047,20 +732,6 @@ def figure_compaction():
     print(latex)
     with open('_plots/compaction.tex', 'w') as f:
         print(latex, file=f)
-
-    # Unused plot code
-    #print(compacted_sizes)
-
-    #print(compacted_sizes/roof_data)
-    #for keys, comp_rate in zip(curves, compaction_rates):
-    #    bits, c_comp = keys
-    #    print(f'B{bits}C{c_comp}:', comp_rate)
-
-    #plot_compaction(
-    #        compacted_sizes,
-    #        dim_range,
-    #        reference_data=roof_data
-    #        )
 
 def plot_tqhd_vs_pqhdc(
         data_tqhd,
@@ -1365,27 +1036,17 @@ def figure_noise():
         loss = _parse_app(acc_path, ref_path)
         losses_pqhdc.append(loss)
 
-    print(losses_pqhdc)
-
-    # Remove results for B3, and B4 for TQHD and PQHDC since they B2 can
-    # already quatize EMG pretty well.
-    #losses_tqhd[-1] = np.expand_dims(losses_tqhd[-1][0], axis=0)
-    #losses_pqhdc[-1] = np.expand_dims(losses_pqhdc[-1][0], axis=0)
-
-    #losses_pqhdc = np.array(losses_pqhdc)
     start = 1
     end = 10
     step = 1
     noise_percents = np.arange(start, end+step, step)
     labels = ['$B2$', '$B3$', '$B4$']
     apps += ['emg']
-    # Filter bits
 
+    # Filter bits
     for i in range(len([*zip(losses_tqhd, losses_pqhdc)])):
         losses_tqhd[i] = losses_tqhd[i][0:3]
         losses_pqhdc[i] = losses_pqhdc[i][0:3]
-    print(losses_tqhd[0].shape)
-    print(losses_pqhdc[0].shape)
     a = [losses_tqhd, losses_pqhdc, noise_percents, apps]
     kw = {
             'xlabel': 'Noise (%)',
@@ -1396,12 +1057,9 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    #figure_intervals_bits()
-    #figure_error_deviation()
-
-    #figure_normal_distribution()
-    #figure_dimension()
-    #figure_compaction()
+    figure_normal_distribution()
+    figure_error_deviation()
+    figure_compaction()
     figure_tqhd_vs_pqhdc()
     figure_noise()
 
