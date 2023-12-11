@@ -111,7 +111,7 @@ function mnist() {
 
 function language() {
     local app="language"
-    local acc_dir="$RESULT_DIR/$app/hdc/map/paper-tqhd"
+    local acc_dir="$RESULT_DIR/$app/hdc/paper-tqhd"
     local pool_dir="$POOL_DIR/$app/hdc"
     launch "src/language.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
