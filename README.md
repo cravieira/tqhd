@@ -1,7 +1,5 @@
 # TQHD
 
-[toc]
-
 ## Setup
 
 Clone this repository and init submodules.
@@ -30,18 +28,27 @@ After installing the dependencies, test the installation by executing all models
 
 If `paper-datasets.sh` runs correctly, then you environment is ready to run the experiments.
 
-## Launching Experiments
+## Running Experiments
 
 There are several scripts to handle the experiments and they must be executed in a proper order.
 
-```
-./paper-accuracy.sh # Executed
-./paper-tqhd.sh # Fixed and executed
+```bash
+./paper-accuracy.sh
+./paper-sign-quantize.sh
+./paper-tqhd.sh
 ./paper-pqhdc.sh
+./paper-fault-tqhd.sh
+./paper-fault-pqhdc.sh
+./paper-compaction.sh
 ```
 
-Each script can be executed in parallel and you can choose whether it should use Cuda. Please make sure to tune the paremeters `JOBS` and `DEVICE` in each script according to your machine. Have in mind that launching multiple jobs in simultaneously requires not only CPU/GPU but also memory available. The best parameters must be found.
+Each script can be executed in parallel and you can choose whether it should use Cuda. Please make sure to tune the paremeters `JOBS` and `DEVICE` in each script according to your machine. Have in mind that launching multiple jobs in simultaneously requires not only CPU/GPU but also memory availability.
 
+Finally, you can generate the plots and other results by running:
+
+```bash
+./paper-plots.sh
+```
 
 ## Repository Explained
 
@@ -53,6 +60,7 @@ All diretories starting with "\_" are considered *private*, and thus, handled by
 | :--------------: | :----------------------------------------------------: |
 | \_accuracy       | Accuracy of unquantized models                         |
 | \_data           | Downloaded datasets                                    |
+| \_plots          | Output plot directory                                  |
 | \_pool           | Trained models serialized to files                     |
 | \_transformation | Accuracy of transformed, i.e., quantized, models       |
 | \_venv           | Python virtual environment                             |
@@ -79,6 +87,10 @@ DEVICE=cuda
 
 # Applications #
 # Function to launch each set of experiments of an application. Each function prints commands to all necessary experiments
+function voicehd()...
+function emg()...
+function mnist()...
+function language()...
 
 # Launcher #
 # Enable Python virtual environment
@@ -110,9 +122,13 @@ flowchart TD
     paper-pqhdc(["paper-pqhdc.sh"])
     paper-fault-pqhdc(["paper-fault-pqhdc.sh"])
     paper-fault-tqhd(["paper-fault-tqhd.sh"])
+		paper-signquantization(["paper-signquantization.sh"])
 
     paper-accuracy --> paper-tqhd
     paper-accuracy --> paper-deviation
     paper-accuracy --> paper-fault-tqhd
     paper-pqhdc --> paper-fault-pqhdc
 ```
+
+The script `paper-accuracy.sh` trains the high precision MAP models. The trained models can be immediately quantized for multiple TQHD experiments. However, PQ-HDC requires that query vectors must be sign quantized at training time before the class bundle. Thus, it is necessary to create a separated pool of models for PQ-HDC.
+
