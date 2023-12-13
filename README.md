@@ -36,6 +36,7 @@ There are several scripts to handle the experiments and they must be executed in
 ./paper-accuracy.sh
 ./paper-sign-quantize.sh
 ./paper-tqhd.sh
+./paper-deviation.sh
 ./paper-pqhdc.sh
 ./paper-fault-tqhd.sh
 ./paper-fault-pqhdc.sh
