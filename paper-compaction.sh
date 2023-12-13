@@ -160,7 +160,7 @@ function launch_patched_emg() {
                     # Split the experiment table into its two variables
                     IFS=' ' read -r bit compaction <<< ${table[i]}
 
-                    local patched_model="$pool_dir/emg-s$subject/tqhd/b$bit/d$dim"
+                    local patched_model="$pool_dir-s$subject/tqhd/b$bit/d$dim/$seed.pt"
                     local csv_path="$acc_dir-s$subject/$patched_model/c$compaction/$seed.csv"
                     echo "py_launch src/compaction.py $patched_model -c $compaction --csv $csv_path"
                 done
@@ -172,7 +172,7 @@ function launch_patched_emg() {
 function emg() {
     local app="emg"
     local acc_dir="$RESULT_DIR/$app"
-    local model_dir=$POOL_DIR/$app
+    local model_dir="$POOL_DIR/$app"
     launch_patched_emg "src/emg.py" "$acc_dir" "$model_dir" exp_table[@]
     echo "\n"
 }
