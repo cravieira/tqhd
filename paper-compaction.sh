@@ -161,7 +161,7 @@ function launch_patched_emg() {
                     IFS=' ' read -r bit compaction <<< ${table[i]}
 
                     local patched_model="$pool_dir-s$subject/tqhd/b$bit/d$dim/$seed.pt"
-                    local csv_path="$acc_dir-s$subject/$patched_model/c$compaction/$seed.csv"
+                    local csv_path="$acc_dir-s$subject/b$bit/d$dim/c$compaction/$seed.csv"
                     echo "py_launch src/compaction.py $patched_model -c $compaction --csv $csv_path"
                 done
             done
