@@ -377,14 +377,15 @@ def plot_deviation(data, dev_range, apps, labels, hline=None, **kwargs):
     plt.tight_layout()
     plot._plot(**kwargs)
 
-def figure_error_deviation():
+def figure_error_deviation(dim=1000, suplementary=False):
     """
     Plot the error to the baseline when varying the standard deviation used.
     """
 
-    def _parse_app_results(experiment_path, reference_path, sq_path):
+    def _parse_app_results(experiment_path, reference_path, sq_path, dim):
         """docstring for _parse_app_results"""
-        all_dirs = list(experiment_path.glob('./*'))
+        # Get all result directories that use a given dimension
+        all_dirs = list(experiment_path.glob(f'./*-d{dim}'))
         # Find the number of bits used in the experiment. The directory contains
         # all runs for the swiped standard deviation range and the evaluated bits.
         # RE to search for the "bits<number>" substring
@@ -395,7 +396,7 @@ def figure_error_deviation():
         bits_experimented = natsort.humansorted(bits_experimented)
 
         # Get all paths to experiments executed for each bit
-        bit_dir_grouped = [list(experiment_path.glob(f'./*{bit}*')) for bit in bits_experimented]
+        bit_dir_grouped = [list(experiment_path.glob(f'./*{bit}*d{dim}')) for bit in bits_experimented]
 
         # Ensure all experiments executed for each bit are sorted so that dev 0.5
         # comes before dev 0.6, for example. The variable below is a list of lists. The
@@ -417,7 +418,7 @@ def figure_error_deviation():
         # The data to be plotted is the accuacy difference to the reference
         data = [np.subtract(reference_acc, acc) for acc in bit_accs]
 
-        # Get the mean loss inflicted by sign quantization
+        ## Get the mean loss inflicted by sign quantization
         signquantize_accs = parse_accuracy_directory(sq_path)
         signquantize_accs = np.array(signquantize_accs)
 
@@ -432,14 +433,14 @@ def figure_error_deviation():
     signquantize_paths = []
     for app in apps:
         experiment_paths.append(Path(f'_transformation/{app}/hdc/deviation'))
-        signquantize_paths.append(Path(f'_transformation/{app}/hdc/signquantize/amsq-d1000'))
-        reference_model_paths.append(Path(f'_accuracy/{app}/hdc/map-encf32-amf32-d1000'))
+        signquantize_paths.append(Path(f'_transformation/{app}/hdc/signquantize/amsq-d{dim}'))
+        reference_model_paths.append(Path(f'_accuracy/{app}/hdc/map-encf32-amf32-d{dim}'))
 
     # Handle the EMG dataset since it has different subjects
     app = 'emg'
     experiment_paths.append(Path(f'_transformation/{app}/hdc/all/deviation'))
-    signquantize_paths.append(Path(f'_transformation/{app}/hdc/all/signquantize/amsq-d1000'))
-    reference_model_paths.append(Path(f'_accuracy/{app}/hdc/all/map-encf32-amf32-d1000'))
+    signquantize_paths.append(Path(f'_transformation/{app}/hdc/all/signquantize/amsq-d{dim}'))
+    reference_model_paths.append(Path(f'_accuracy/{app}/hdc/all/map-encf32-amf32-d{dim}'))
     apps.append(app)
 
     # Parse data to be plotted. Data is a list of list of numpy arrays.
@@ -450,7 +451,7 @@ def figure_error_deviation():
     sq_losses = []
     labels = None
     for exp_path, ref_path, sq_path in zip(experiment_paths, reference_model_paths, signquantize_paths):
-        accs, labels, sq_loss = _parse_app_results(exp_path, ref_path, sq_path)
+        accs, labels, sq_loss = _parse_app_results(exp_path, ref_path, sq_path, dim)
         data.append(accs)
         sq_losses.append(sq_loss)
 
@@ -469,6 +470,9 @@ def figure_error_deviation():
     # Allow global function to select only a subset of the experimented bits in
     # TQHD.
     data, labels = select_bits(data, labels)
+    path = '_plots/error_deviation'
+    if suplementary:
+        path += f'-suplement-d{dim}'
 
     plot_deviation(
         data,
@@ -476,7 +480,7 @@ def figure_error_deviation():
         apps,
         labels=labels,
         hline=sq_losses,
-        path='_plots/error_deviation.pdf'
+        path=path+'.pdf'
     )
     plot_deviation(
         data,
@@ -484,7 +488,7 @@ def figure_error_deviation():
         apps,
         labels=labels,
         hline=sq_losses,
-        path='_plots/error_deviation.png'
+        path=path+'.png'
     )
 
     def _find_max_diff(data):
@@ -543,8 +547,9 @@ def figure_error_deviation():
         print(diff_bits)
 
     # Find biggest mean between best choice of P and 1.0
-    _find_max_diff(data)
-    _find_p1_progression(data)
+    if not suplementary:
+        _find_max_diff(data)
+        _find_p1_progression(data)
 
 def plot_dimension(data, dim_range, apps, labels, sq_loss, **kwargs):
     """docstring for plot_dimension"""
@@ -1062,6 +1067,12 @@ def main():
     figure_compaction()
     figure_tqhd_vs_pqhdc()
     figure_noise()
+
+    # Suplementary deviation experiment
+    # This loops extends the design space exploration to also sweep dimensions
+    # in D=[2K, 10K].
+    #for i in range(2000, 10000+1, 1000):
+    #    figure_error_deviation(i, suplementary=True)
 
 if __name__ == '__main__':
     main()
