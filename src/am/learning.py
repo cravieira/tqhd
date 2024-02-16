@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import torch
 from torch import Tensor
 
 from typing import TYPE_CHECKING
@@ -27,4 +28,14 @@ class Centroid(BaseLearningStrategy):
 
     def update(self, am: 'BaseAM', input: Tensor, idx: Tensor, retrain=False):
         """docstring for update"""
-        am.add(input, idx)
+        # TODO: This implementation might not work with batched tensors
+        if retrain == False:
+            am.add(input, idx)
+        else:
+            # Retraining algorithm is based on the one described in VoiceHD's
+            # paper.
+            logit = am.search(input)
+            pred_class = torch.argmax(logit)
+            if pred_class != idx:
+                am.sub(input, pred_class)
+                am.add(input, idx)

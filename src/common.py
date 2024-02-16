@@ -1,5 +1,6 @@
 import argparse
 from argparse import ArgumentParser
+import io
 from pathlib import Path
 import sys
 from typing import Callable, Optional
@@ -91,6 +92,23 @@ def add_default_arguments(parser: ArgumentParser):
             action='store_true',
             default=False,
             help='Skip test of a model.'
+            )
+
+    parser.add_argument(
+            '--retrain-rounds',
+            type=int,
+            default=0,
+            help='Number of retrain iterations. Returns a trained model after'
+            'the given number of retraining rounds. Consider using the flag'
+            '"--retrain-best" to return the best model in all retraining'
+            'rounds.'
+            )
+
+    parser.add_argument(
+            '--retrain-best',
+            action='store_true',
+            help='Return the model with best prediction accuracy regarding the'
+            'test dataset considering all retraining rounds.'
             )
 
     return parser
@@ -422,14 +440,74 @@ def save_results(
                 )
         dump_accuracy(args.accuracy_file, accuracy)
 
-def train_hdc(model, train_ld, device):
-    with torch.no_grad():
-        for samples, labels in tqdm(train_ld, desc='Training'):
-            samples = samples.to(device)
-            labels = labels.to(device)
+def _clone_torch_model(model):
+    """
+    Clone a pytorch model state.
+    """
+    # Using io.BytesIO() since the current version of pytorch does not support
+    # deepcopy.
+    buffer = io.BytesIO()
+    torch.save(model, buffer)
+    return buffer
 
-            samples_hv = model.encode(samples)
-            model.am.update(samples_hv, labels)
+def _restore_torch_model(state):
+    """
+    Restore a model to a given state.
+    """
+    state.seek(0)
+    model = torch.load(state)
+    return model
+
+def _train_loop(model, train_ld, device, retrain=False, desc='Training'):
+    """
+    Simple train loop. Iterate over the dataset and update AM
+    """
+    for samples, labels in tqdm(train_ld, desc=desc):
+        samples = samples.to(device)
+        labels = labels.to(device)
+
+        samples_hv = model.encode(samples)
+        model.am.update(samples_hv, labels, retrain=retrain)
+
+    return model
+
+def train_hdc(model, train_ld, device, retrain_rounds=0, test_ld=None, retrain_best=False):
+    num_classes = model.am.num_classes
+
+    with torch.no_grad():
+        # Simple train logic without retraining
+        if not retrain_rounds:
+            model = _train_loop(model, train_ld, device, retrain=False, desc='Training')
+            model.create_am()
+            return model
+
+        # Retraining
+        best_acc = 0.0
+        best_model_dict = _clone_torch_model(model)
+        for i in range(retrain_rounds):
+            # Flag to control whether we are in a retraining round.
+            retrain = i != 0
+
+            # Regular training loop
+            for samples, labels in tqdm(train_ld, desc=f'Retraining {i}'):
+                samples = samples.to(device)
+                labels = labels.to(device)
+
+                # samples_hv could be stored in a list to avoid encoding it again in retraining
+                samples_hv = model.encode(samples)
+                model.am.update(samples_hv, labels, retrain=retrain)
+            model.create_am()
+
+            # Predict the retrained model on the test dataset
+            acc = test_hdc(model, test_ld, num_classes, device)
+            # Update the best model found so far
+            if acc > best_acc:
+                best_model_dict = _clone_torch_model(model)
+                best_acc = acc
+
+        # Should we return the best trained model considering all retraining rounds?
+        if retrain_best:
+            model = _restore_torch_model(model, best_model_dict)
 
     model.create_am()
     return model
@@ -450,14 +528,20 @@ def test_hdc(model, test_ld, num_classes, device):
     print(f'Testing accuracy of {final_acc:.3f}%')
     return final_acc
 
-def args_train_hdc(args, model, train_ld):
+def args_train_hdc(args, model, train_ld, test_ld=None):
     '''
     High level function to control training according to the parameters given
     to the ArgumentParser.
     '''
     if args.skip_train:
         return model
-    return train_hdc(model, train_ld, args.device)
+    return train_hdc(
+            model,
+            train_ld,
+            args.device,
+            retrain_rounds=args.retrain_rounds,
+            retrain_best=args.retrain_best,
+            test_ld=test_ld)
 
 def args_test_hdc(args, model, test_ld, num_classes) -> Optional[float]:
     '''
