@@ -4,7 +4,7 @@ import io
 from pathlib import Path
 import sys
 from typing import Callable, Optional
-from am.am import AMMap, AMSignQuantize, AMThermometerDeviation, PQHDC
+from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -128,7 +128,7 @@ def map_dtype(key: str):
 
 def add_default_hdc_arguments(parser: ArgumentParser):
     # Default HDC model tuning parameters
-    vsa_type = { 'MAP' }
+    vsa_type = [ 'MAP', 'BSC' ]
     default_vsa = 'MAP'
     default_dtype_enc = 'f32'
     default_dtype_am = 'f32'
@@ -293,6 +293,9 @@ def pick_am_model(
     if am_type == 'V':
         if vsa == 'MAP':
             am = AMMap(dim, num_classes, learning=learning, **kwargs)
+        elif vsa == 'BSC':
+            am = AMBsc(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
+
     elif am_type == 'TQHD':
         bits = kwargs['am_bits']
         intervals = kwargs['am_intervals']

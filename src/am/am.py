@@ -176,7 +176,7 @@ class AMBsc(BaseAM):
         Finish AM train and enable it to execute searches.
         """
         tensors = [a.maj() for a in self.accumulators]
-        self.am = torch.stack(tensors)
+        self.am = torch.vstack(tensors)
 
     def search(self, query: torch.Tensor):
         """
@@ -190,15 +190,19 @@ class AMBsc(BaseAM):
         """
         Add the input tensors to the AM class.
         """
-        for i in range(len(idx)):
-            self.accumulators[idx[i]].add(input[i])
+        #for i in range(len(idx)):
+        #    self.accumulators[idx[i]].add(input[i])
+        # Non-batched implementation
+        self.accumulators[idx].add(input)
 
     def sub(self, input: torch.Tensor, idx: torch.Tensor):
         """
         Sub the input tensors from the given AM classes.
         """
-        for i in range(len(idx)):
-            self.accumulators[idx[i]].add(input[i])
+        #for i in range(len(idx)):
+        #    self.accumulators[idx[i]].add(input[i])
+        # Non-batched implementation
+        self.accumulators[idx].add(torch.logical_not(input))
 
 # Quantization AMs #
 # These AMs are experimental models that perform quantization. The goal is to
