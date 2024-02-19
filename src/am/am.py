@@ -144,12 +144,16 @@ class _Accumulator():
         count = self.acc
         generator=None
 
+        # TODO: Solve bug when maj() is called several times in a row. Maybe
+        # the problem is in "count = self.acc" passing a reference and not
+        # copying the underlying tensor. So when "count += tiebreaker" is
+        # executed, the "self.acc" is changed forever.
         # add a tiebreaker when there are an even number of hvs
-        if n % 2 == 0:
-            tiebreaker = torch.empty_like(count)
-            tiebreaker.bernoulli_(0.5, generator=generator)
-            count += tiebreaker
-            n += 1
+        #if n % 2 == 0:
+        #    tiebreaker = torch.empty_like(count)
+        #    tiebreaker.bernoulli_(0.5, generator=generator)
+        #    count += tiebreaker
+        #    n += 1
 
         threshold = n // 2
         return torch.greater(count, threshold).to(torch.int8)
