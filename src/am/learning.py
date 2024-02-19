@@ -39,3 +39,7 @@ class Centroid(BaseLearningStrategy):
             if pred_class != idx:
                 am.sub(input, pred_class)
                 am.add(input, idx)
+
+                # Update AM in use for the subsequent predictions in the
+                # retraining loop
+                am.train_am()
