@@ -487,18 +487,35 @@ def train_hdc(model, train_ld, device, retrain_rounds=0, test_ld=None, retrain_b
         # Retraining
         best_acc = 0.0
         best_model_dict = _clone_torch_model(model)
+        dataset = [] # A list of tuples of encoded query vectors and their labels
         for i in range(retrain_rounds):
             # Flag to control whether we are in a retraining round.
             retrain = i != 0
 
+            # Choose between the pytorch loader and the dataset stored in memory
+            retrain_loader = dataset if dataset else train_ld
+
             # Regular training loop
-            for samples, labels in tqdm(train_ld, desc=f'Retraining {i}'):
+            for samples, labels in tqdm(retrain_loader, desc=f'Retraining {i}'):
                 samples = samples.to(device)
                 labels = labels.to(device)
 
                 # samples_hv could be stored in a list to avoid encoding it again in retraining
-                samples_hv = model.encode(samples)
+                if not retrain:
+                    samples_hv = model.encode(samples)
+                else:
+                    samples_hv = samples
+
                 model.am.update(samples_hv, labels, retrain=retrain)
+
+                # Cache the encoded HV and labels to increase retraining speed
+                if not retrain:
+                    # Store the tensors in CPU to avoid keeping the entire
+                    # dataset in the GPU if 'cuda' is being used.
+                    samples_hv.cpu()
+                    labels.cpu()
+                    dataset.append((samples_hv, labels))
+
             model.create_am()
 
             # Predict the retrained model on the test dataset
