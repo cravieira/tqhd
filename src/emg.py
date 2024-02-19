@@ -130,7 +130,13 @@ def experiment(args, am_args, subjects=[0], device="cpu"):
             **am_args
             )
     num_classes = len(train_ld.dataset.dataset.classes)
-    model = common.train_hdc(model, train_ld, device)
+    model = common.train_hdc(
+            model,
+            train_ld,
+            device,
+            test_ld=test_ld,
+            retrain_rounds=args.retrain_rounds,
+            retrain_best=args.retrain_best)
     accuracy = common.test_hdc(model, test_ld, num_classes, device)
 
     if args.export:

@@ -107,7 +107,7 @@ def main():
             )
     model = common.args_pick_model(args, constructor)
 
-    model = common.args_train_hdc(args, model, train_ld)
+    model = common.args_train_hdc(args, model, train_ld, test_ld=test_ld)
     accuracy = common.args_test_hdc(args, model, test_ld, num_classes)
 
     common.save_results(args, model, train_ld, accuracy)
