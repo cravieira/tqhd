@@ -510,7 +510,7 @@ def train_hdc(model, train_ld, device, retrain_rounds=0, test_ld=None, retrain_b
 
         # Should we return the best trained model considering all retraining rounds?
         if retrain_best:
-            model = _restore_torch_model(model, best_model_dict)
+            model = _restore_torch_model(best_model_dict)
 
     model.create_am()
     return model
