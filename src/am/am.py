@@ -126,19 +126,23 @@ class _Accumulator():
         self.dim = dim
         self.elements = 0
         self.acc = torch.zeros((dim), dtype=torch.long, device=device)
+        self._need_update = True # Control flag
+        self._cache = None # Bundled tensor
 
     def add(self, input: torch.Tensor):
         """docstring for add"""
         self.acc = self.acc + input
         self.elements += 1
+        self._need_update = True
 
     def sub(self, input: torch.Tensor):
         """docstring for add"""
         self.acc = self.acc - input
         self.elements -= 1
+        self._need_update = True
 
-    def maj(self):
-        """docstring for maj"""
+    def _maj(self):
+        """docstring for _maj"""
         n = self.elements
 
         count = self.acc
@@ -157,6 +161,17 @@ class _Accumulator():
 
         threshold = n // 2
         return torch.greater(count, threshold).to(torch.int8)
+
+    def maj(self):
+        """docstring for maj"""
+        # Return a copy of the cached tensor instead of a reference to an
+        # inner attribute.
+        if not self._need_update:
+            return self._cache.clone()
+
+        # Recompute cache and return a copy to it.
+        self._cache = self._maj()
+        return self._cache.clone()
 
 class AMBsc(BaseAM):
     """
