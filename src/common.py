@@ -10,7 +10,7 @@ import torchmetrics
 from tqdm import tqdm
 from patchmodel import transform_am
 
-from am.learning import Centroid
+from am.learning import Centroid, CentroidOnline
 from am.prediction import Fault, Normal
 
 _current_pytorch_device = "cpu"
@@ -217,6 +217,16 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Choose the multiplier used with the standard deviation when assigning the quantization poles of TQHD. Only positve float values are accepted. Defaults to {default_deviation}.'
             )
 
+    learning_types = ['Centroid', 'CentroidOnline']
+    default_learning = 'Centroid'
+    group.add_argument(
+            '--am-learning',
+            default=default_learning,
+            choices=learning_types,
+            type=str,
+            help=f'Chooses the learning strategy used by the AM. Defaults to {default_learning}.'
+            )
+
     prediction_types = ['Normal', 'Fault']
     default_prediction = 'Normal'
     group.add_argument(
@@ -267,9 +277,16 @@ def args_pick_learning(args):
     """
     Get the learning strategy based on the argument parser.
     """
-    learning = Centroid()
+    learning = None
+    if args.am_learning == 'Centroid':
+        learning = Centroid()
+    elif args.am_learning == 'CentroidOnline':
+        learning = CentroidOnline()
+    else:
+        RuntimeError(f"Invalid learning strategy \"{args.am_learning}\"")
 
     return learning
+
 
 def args_pick_prediction(args):
     """
