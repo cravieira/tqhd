@@ -681,7 +681,56 @@ class PQHDC(AMMap):
         v = self.bipolarize(input)
         super().sub(v, idx)
 
-class QuantHDBin(AMMap):
+class BaseQuantHD(AMMap):
+    """docstring for BaseQuantHD"""
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            alpha: float=0.05,
+            dtype=torch.get_default_dtype(),
+            device=None,
+            **kwargs):
+        super().__init__(dim, num_classes, dtype=dtype, device=device, **kwargs)
+        self._alpha = alpha
+        # Trained flag to control whether the QuantHD model was trained at
+        # least once.
+        self._trained = False
+
+    @abstractmethod
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        pass
+
+    @abstractmethod
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        pass
+
+    def add(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Add the input tensors to the AM class.
+        """
+        #input = torchhd.hard_quantize(input)
+        if self._trained:
+            super().add(input*self._alpha, idx)
+        else:
+            super().add(input, idx)
+
+    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Sub the input tensors from the given AM classes.
+        """
+        if self._trained:
+            super().sub(input*self._alpha, idx)
+        else:
+            super().sub(input, idx)
+
+class QuantHDBin(BaseQuantHD):
     """
     Implementation of the binary QuantHD model as proposed by the paper
     "QuantHD: A Quantization Framework for Hyperdimensional Computing".
@@ -694,10 +743,8 @@ class QuantHDBin(AMMap):
             dtype=torch.get_default_dtype(),
             device=None,
             **kwargs):
-        super(QuantHDBin, self).__init__(dim, num_classes, dtype=dtype, device=device, **kwargs)
-        self._alpha = alpha
+        super(QuantHDBin, self).__init__(dim, num_classes, alpha=alpha, dtype=dtype, device=device, **kwargs)
         # Control flag to check if this AM was already trained
-        self._trained = False
 
     def _map_to_bin(self, input):
         # Sign quantize the input to {-1, 1}
@@ -721,22 +768,3 @@ class QuantHDBin(AMMap):
         hq = self._map_to_bin(query)
         logit = torchhd.hamming_similarity(hq, self.am)
         return logit
-
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
-        """
-        Add the input tensors to the AM class.
-        """
-        #input = torchhd.hard_quantize(input)
-        if self._trained:
-            super().add(input*self._alpha, idx)
-        else:
-            super().add(input, idx)
-
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
-        """
-        Sub the input tensors from the given AM classes.
-        """
-        if self._trained:
-            super().sub(input*self._alpha, idx)
-        else:
-            super().sub(input, idx)
