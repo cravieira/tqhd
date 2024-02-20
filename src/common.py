@@ -4,7 +4,7 @@ import io
 from pathlib import Path
 import sys
 from typing import Callable, Optional
-from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC
+from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC, QuantHDBin
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -182,7 +182,7 @@ def _float_range(mini, maxi):
 
 def add_am_arguments(parser: ArgumentParser):
     default_am = 'V'
-    am_types = ['V', 'TQHD', 'SQ', 'PQHDC']
+    am_types = ['V', 'TQHD', 'SQ', 'PQHDC', 'QuantHDBin']
 
     group = parser.add_argument_group('Associative Memory', 'Allows fine control of AM parameters.')
 
@@ -243,6 +243,15 @@ def add_am_arguments(parser: ArgumentParser):
             default=default_projections,
             type=int,
             help=f'Chooses the number of projections used by PQHDC. Defaults to {default_projections}.'
+            )
+
+    # Alpha learning parameter to use with QuantHD
+    default_quanthd_alpha = 0.05 # Valure obtained from the paper, Section 3B.
+    group.add_argument(
+            '--am-quanthd-alpha',
+            default=default_quanthd_alpha,
+            type=float,
+            help=f'Alpha learning parameter used in QuantHD. Defaults to {default_quanthd_alpha}.'
             )
 
 def parse_am_group(parser, args):
@@ -306,6 +315,9 @@ def pick_am_model(
     elif am_type == 'PQHDC':
         projections = kwargs['am_pqhdc_projections']
         am = PQHDC(dim, num_classes, projections=projections, learning=learning, prediction=prediction, **kwargs)
+    elif am_type == 'QuantHDBin':
+        alpha = kwargs['am_quanthd_alpha']
+        am = QuantHDBin(dim, num_classes, alpha, **kwargs)
 
     else:
         raise RuntimeError(f'Unrecognized AM type: {am_type}.')

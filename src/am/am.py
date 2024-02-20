@@ -680,3 +680,63 @@ class PQHDC(AMMap):
     def sub(self, input: torch.Tensor, idx: torch.Tensor):
         v = self.bipolarize(input)
         super().sub(v, idx)
+
+class QuantHDBin(AMMap):
+    """
+    Implementation of the binary QuantHD model as proposed by the paper
+    "QuantHD: A Quantization Framework for Hyperdimensional Computing".
+    """
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            alpha: float=0.05,
+            dtype=torch.get_default_dtype(),
+            device=None,
+            **kwargs):
+        super(QuantHDBin, self).__init__(dim, num_classes, dtype=dtype, device=device, **kwargs)
+        self._alpha = alpha
+        # Control flag to check if this AM was already trained
+        self._trained = False
+
+    def _map_to_bin(self, input):
+        # Sign quantize the input to {-1, 1}
+        t = torchhd.hard_quantize(input)
+        # Map the values to {0, 1}
+        return (t + 1) / 2
+
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        # No need to call super's train_am() since it only updates the AM in use
+        #super().train_am()
+        self.am = self._map_to_bin(self.weight)
+        self._trained = True
+
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        hq = self._map_to_bin(query)
+        logit = torchhd.hamming_similarity(hq, self.am)
+        return logit
+
+    def add(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Add the input tensors to the AM class.
+        """
+        #input = torchhd.hard_quantize(input)
+        if self._trained:
+            super().add(input*self._alpha, idx)
+        else:
+            super().add(input, idx)
+
+    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Sub the input tensors from the given AM classes.
+        """
+        if self._trained:
+            super().sub(input*self._alpha, idx)
+        else:
+            super().sub(input, idx)
