@@ -768,3 +768,45 @@ class QuantHDBin(BaseQuantHD):
         hq = self._map_to_bin(query)
         logit = torchhd.hamming_similarity(hq, self.am)
         return logit
+
+class QuantHDTri(BaseQuantHD):
+    """docstring for QuantHDTri"""
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            alpha: float=0.05,
+            threshold: float=0.42,
+            dtype=torch.get_default_dtype(),
+            device=None,
+            **kwargs):
+        super(QuantHDTri, self).__init__(dim, num_classes, alpha=alpha, dtype=dtype, device=device, **kwargs)
+        # Standard deviation threshold used in ternary quantization. Defaults
+        # to 0.42 as suggested in Section IV C.
+        self._threshold = threshold
+
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        t = self.weight
+        t_norm = normalize(t)
+        std = torch.std(t_norm)
+        out = torch.zeros(t.shape)
+
+        # Map values above the upper and lower threshold to 1 and -1, respectively
+        up_idx = t_norm > (std*self._threshold)
+        down_idx = t_norm < (-std*self._threshold)
+        out[up_idx] = 1.0
+        out[down_idx] = -1.0
+        self.am = out
+
+        self._trained = True
+
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        hq = torchhd.hard_quantize(query)
+        logit = torchhd.dot_similarity(hq, self.am)
+        return logit

@@ -4,7 +4,7 @@ import io
 from pathlib import Path
 import sys
 from typing import Callable, Optional
-from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC, QuantHDBin
+from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -182,7 +182,7 @@ def _float_range(mini, maxi):
 
 def add_am_arguments(parser: ArgumentParser):
     default_am = 'V'
-    am_types = ['V', 'TQHD', 'SQ', 'PQHDC', 'QuantHDBin']
+    am_types = ['V', 'TQHD', 'SQ', 'PQHDC', 'QuantHDBin', 'QuantHDTri']
 
     group = parser.add_argument_group('Associative Memory', 'Allows fine control of AM parameters.')
 
@@ -264,6 +264,14 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Alpha learning parameter used in QuantHD. Defaults to {default_quanthd_alpha}.'
             )
 
+    default_quanthd_tri_threshold = 0.42 # Valure obtained from the paper, Section 3B.
+    group.add_argument(
+            '--am-quanthd-ternary-threshold',
+            default=default_quanthd_tri_threshold,
+            type=float,
+            help=f'Sigma threshold used in QuantHD ternary model projection. Defaults to {default_quanthd_tri_threshold}.'
+            )
+
 def parse_am_group(parser, args):
     arg_groups={}
     for group in parser._action_groups:
@@ -335,6 +343,10 @@ def pick_am_model(
     elif am_type == 'QuantHDBin':
         alpha = kwargs['am_quanthd_alpha']
         am = QuantHDBin(dim, num_classes, alpha, **kwargs)
+    elif am_type == 'QuantHDTri':
+        alpha = kwargs['am_quanthd_alpha']
+        threshold = kwargs['am_quanthd_ternary_threshold']
+        am = QuantHDTri(dim, num_classes, alpha, threshold=threshold, **kwargs)
 
     else:
         raise RuntimeError(f'Unrecognized AM type: {am_type}.')
