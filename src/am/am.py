@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from enum import Enum, auto
 import math
 import torch
 import torchhd
@@ -279,6 +280,11 @@ class AMThermometer(AMMap):
     """
     Quantizes vector to Thermometer patterns.
     """
+
+    class TableType(Enum):
+        BaseZero = auto(),
+        BandMatrix = auto()
+
     def __init__(
             self,
             dim,
@@ -287,6 +293,7 @@ class AMThermometer(AMMap):
             intervals,
             dtype=torch.get_default_dtype(),
             device=None,
+            enc_table_type: TableType=TableType.BaseZero,
             **kwargs):
         self.possible_encodings = bits + 1
         if intervals > self.possible_encodings:
@@ -297,31 +304,45 @@ class AMThermometer(AMMap):
         self.intervals = intervals
         self.register_buffer('enc_table', None)
         self.register_buffer('poles', None)
-        self.enc_table = self._encode_table(bits, intervals)
+        self.enc_table = self._encode_table(bits, intervals, enc_table_type)
         self.poles = None
 
-    def _encode_table(self, bits, entries):
+    def _encode_table(self, bits, entries, table_type):
         """
         Create the encode table based on a Thermometer encoding.
         """
         all_combinations = bits+1
-        t = torchhd.thermometer(all_combinations, bits, vsa='BSC')
 
-        enc_table = t
-        # Remove middle entries if the number of required entries is less than
-        # the number of thermometer encodings available.
-        if entries < all_combinations:
-            rows = entries//2 # Number of top and below rows used
-            top_rows = t[..., 0:rows, :]
-            bot_rows = t[..., -rows:, :]
+        if table_type == self.TableType.BaseZero:
+            t = torchhd.thermometer(all_combinations, bits, vsa='BSC')
 
-            # Create the final table without the rows in the middle
-            enc_table = torch.vstack([top_rows, bot_rows])
-        # enc_table is a BSC vector and it cannot be used together with MAP,
-        # otherwise torchhd throws an exception when indexing. Convert the
-        # generated themometer table to MAP.
-        enc_table = torchhd.ensure_vsa_tensor(enc_table, vsa='MAP', dtype=torch.int32)
-        return enc_table
+            enc_table = t
+            # Remove middle entries if the number of required entries is less than
+            # the number of thermometer encodings available.
+            if entries < all_combinations:
+                rows = entries//2 # Number of top and below rows used
+                top_rows = t[..., 0:rows, :]
+                bot_rows = t[..., -rows:, :]
+
+                # Create the final table without the rows in the middle
+                enc_table = torch.vstack([top_rows, bot_rows])
+            # enc_table is a BSC vector and it cannot be used together with MAP,
+            # otherwise torchhd throws an exception when indexing. Convert the
+            # generated themometer table to MAP.
+            enc_table = torchhd.ensure_vsa_tensor(enc_table, vsa='MAP', dtype=torch.int32)
+            print(enc_table)
+            return enc_table
+
+        elif table_type == self.TableType.BandMatrix:
+            enc_table = torch.zeros((bits+1, bits))
+            k1 = bits // 2 # Lower bandwidth
+            k2 = bits // 2 - 1+(bits%2) # Upper bandwidth
+            for i, row in enumerate(enc_table):
+                for j, elem in enumerate(row):
+                    enc_table[i, j] = 1 if (j < i-k1 or j > i+k2) else 0
+            enc_table = torchhd.ensure_vsa_tensor(enc_table, vsa='MAP', dtype=torch.int32)
+            print(enc_table)
+            return enc_table
 
     @abstractmethod
     def _create_poles(self, input) -> torch.Tensor:

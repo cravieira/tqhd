@@ -4,7 +4,7 @@ import io
 from pathlib import Path
 import sys
 from typing import Callable, Optional
-from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
+from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -217,6 +217,15 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Choose the multiplier used with the standard deviation when assigning the quantization poles of TQHD. Only positve float values are accepted. Defaults to {default_deviation}.'
             )
 
+    encode_table_dict = AMThermometer.TableType._member_map_
+    default_encode_table = 'BaseZero'
+    group.add_argument(
+            '--am-tqhd-encode-table',
+            default=default_encode_table,
+            choices=encode_table_dict.keys(),
+            help=f'Choose the thermometer encode table used. Defaults to "{default_encode_table}".'
+            )
+
     learning_types = ['Centroid', 'CentroidOnline']
     default_learning = 'Centroid'
     group.add_argument(
@@ -334,7 +343,9 @@ def pick_am_model(
         bits = kwargs['am_bits']
         intervals = kwargs['am_intervals']
         deviation = kwargs['am_tqhd_deviation']
-        am = AMThermometerDeviation(dim, num_classes, bits, intervals, deviation, learning=learning, prediction=prediction, **kwargs)
+        enc_table = kwargs['am_tqhd_encode_table']
+        enc_table = AMThermometerDeviation.TableType._member_map_[enc_table]
+        am = AMThermometerDeviation(dim, num_classes, bits, intervals, deviation, enc_table_type=enc_table, learning=learning, prediction=prediction, **kwargs)
     elif am_type == 'SQ':
         am = AMSignQuantize(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
     elif am_type == 'PQHDC':
