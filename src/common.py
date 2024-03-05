@@ -526,7 +526,28 @@ def _train_loop(model, train_ld, device, retrain=False, desc='Training'):
 
     return model
 
-def train_hdc(model, train_ld, device, retrain_rounds=0, test_ld=None, retrain_best=False):
+def train_hdc(
+        model,
+        train_ld,
+        device,
+        retrain_rounds=0,
+        test_ld=None,
+        retrain_best: bool=False
+        ):
+    """
+    General purpose training function for HDC models.
+
+    This function supports training for multiple rounds and predicting the
+    accuracy on the test dataset if a test loader is given. It can also return
+    the best trained model considering the accuracy on a test dataset.
+
+    :param model: HDC model.
+    :param train_ld: Train dataset loader.
+    :param device: Torch device to run training.
+    :param retrain_rounds: Number of retrain rounds. Defaults to 0 (no retraining).
+    :param test_ld: Test/Validation dataset to evaluate accuracy at each retraining.
+    :param retrain_best: Returns the best trained model considering accuracy on test_ld.
+    """
     num_classes = model.am.num_classes
 
     with torch.no_grad():
@@ -539,6 +560,8 @@ def train_hdc(model, train_ld, device, retrain_rounds=0, test_ld=None, retrain_b
         # Retraining
         best_acc = 0.0
         best_model_dict = _clone_torch_model(model)
+
+        # Store the dataset in memory for faster retraining
         dataset = [] # A list of tuples of encoded query vectors and their labels
         for i in range(retrain_rounds):
             # Flag to control whether we are in a retraining round.
