@@ -563,7 +563,7 @@ def train_hdc(
 
         # Store the dataset in memory for faster retraining
         dataset = [] # A list of tuples of encoded query vectors and their labels
-        for i in range(retrain_rounds):
+        for i in range(retrain_rounds+1):
             # Flag to control whether we are in a retraining round.
             retrain = i != 0
 
