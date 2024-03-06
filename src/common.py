@@ -684,6 +684,18 @@ def test_hdc(model, test_ld, num_classes, device):
     print(f'Testing accuracy of {final_acc:.3f}%')
     return final_acc
 
+def args_retrain_acc_dumper(args):
+    """
+    Create the retrain accuracy dumper generator based on the default
+    argument parser.
+    """
+    retrain_acc_dumper = None
+    if args.retrain_dump_acc:
+        retrain_acc_dumper = gen_retrain_dump_acc(
+                args.retrain_dump_acc,
+                args.retrain_dump_acc_suffix)
+    return retrain_acc_dumper
+
 def args_train_hdc(args, model, train_ld, test_ld=None):
     '''
     High level function to control training according to the parameters given
@@ -694,11 +706,7 @@ def args_train_hdc(args, model, train_ld, test_ld=None):
 
     # Does the user want to save the accuracy on the test dataset at the end of
     # each retraining round?
-    retrain_acc_dumper = None
-    if args.retrain_dump_acc:
-        retrain_acc_dumper = gen_retrain_dump_acc(
-                args.retrain_dump_acc,
-                args.retrain_dump_acc_suffix)
+    retrain_acc_dumper = args_retrain_acc_dumper(args)
 
     return train_hdc(
             model,
