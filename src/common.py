@@ -1,9 +1,10 @@
 import argparse
 from argparse import ArgumentParser
 import io
+import itertools
 from pathlib import Path
 import sys
-from typing import Callable, Optional
+from typing import Callable, Generator, Optional, List
 from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
@@ -94,6 +95,7 @@ def add_default_arguments(parser: ArgumentParser):
             help='Skip test of a model.'
             )
 
+    # Retrain parameters
     parser.add_argument(
             '--retrain-rounds',
             type=int,
@@ -109,6 +111,25 @@ def add_default_arguments(parser: ArgumentParser):
             action='store_true',
             help='Return the model with best prediction accuracy regarding the'
             'test dataset considering all retraining rounds.'
+            )
+
+    parser.add_argument(
+            '--retrain-dump-acc',
+            type=str,
+            default=None,
+            help='Dump accuracies produced on retraining iterations. The '
+            'accuracies are dumped to the path '
+            '<prefix>r<retrain_iteration><suffix>. The middle term '
+            '"<retrain_iteration>" is controlled by this script and indicates'
+            'the retraining round being dumped. The path is created if not existent.'
+            )
+
+    parser.add_argument(
+            '--retrain-dump-acc-suffix',
+            type=str,
+            default=None,
+            help='Path added as suffix path when dumping accuracies on'
+            'retraining. Must be used with --retrian-dump-acc.'
             )
 
     return parser
@@ -526,13 +547,22 @@ def _train_loop(model, train_ld, device, retrain=False, desc='Training'):
 
     return model
 
+def gen_retrain_dump_acc(path, suffix: Optional[str]) -> Generator[str, None, None]:
+    """docstring for gen_retraining_dump_acc"""
+    i = 0
+    suf = suffix if suffix else ''
+    while True:
+        yield f'{path}{i}{suf}'
+        i += 1
+
 def train_hdc(
         model,
         train_ld,
         device,
         retrain_rounds=0,
         test_ld=None,
-        retrain_best: bool=False
+        retrain_best: bool=False,
+        gen_retrain_dump_acc: Optional[Generator[str, None, None]] = None
         ):
     """
     General purpose training function for HDC models.
@@ -547,8 +577,17 @@ def train_hdc(
     :param retrain_rounds: Number of retrain rounds. Defaults to 0 (no retraining).
     :param test_ld: Test/Validation dataset to evaluate accuracy at each retraining.
     :param retrain_best: Returns the best trained model considering accuracy on test_ld.
+    :param gen_retrain_dump_acc: A generator function that returns the path to
+    dump the accuracy of of a retrained model on the "test_ld" dataset parameter.
     """
     num_classes = model.am.num_classes
+
+    if gen_retrain_dump_acc:
+        # Obtain a list of file paths to dump the accuracies on retraining.
+        it = itertools.islice(gen_retrain_dump_acc, retrain_rounds+1)
+        retrain_acc_paths = list(it)
+    else:
+        retrain_acc_paths = None
 
     with torch.no_grad():
         # Simple train logic without retraining
@@ -600,6 +639,10 @@ def train_hdc(
                 best_model_dict = _clone_torch_model(model)
                 best_acc = acc
 
+            # Dump accuracy to file
+            if retrain_acc_paths:
+                dump_accuracy(retrain_acc_paths[i], acc)
+
         # Should we return the best trained model considering all retraining rounds?
         if retrain_best:
             model = _restore_torch_model(best_model_dict)
@@ -630,13 +673,23 @@ def args_train_hdc(args, model, train_ld, test_ld=None):
     '''
     if args.skip_train:
         return model
+
+    # Does the user want to save the accuracy on the test dataset at the end of
+    # each retraining round?
+    retrain_acc_dumper = None
+    if args.retrain_dump_acc:
+        retrain_acc_dumper = gen_retrain_dump_acc(
+                args.retrain_dump_acc,
+                args.retrain_dump_acc_suffix)
+
     return train_hdc(
             model,
             train_ld,
             args.device,
             retrain_rounds=args.retrain_rounds,
             retrain_best=args.retrain_best,
-            test_ld=test_ld)
+            test_ld=test_ld,
+            gen_retrain_dump_acc=retrain_acc_dumper)
 
 def args_test_hdc(args, model, test_ld, num_classes) -> Optional[float]:
     '''
