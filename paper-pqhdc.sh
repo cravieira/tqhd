@@ -13,7 +13,7 @@ source common.sh
 RESULT_DIR=_transformation # Result dir to be created
 POOL_DIR=_pool # Model pool keep serialized trained models
 MAX_SEED=20 # Max number of seeds evaluated
-JOBS=8 # Number of parallel jobs to be executed
+JOBS=10 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 
 start=1000
@@ -94,5 +94,5 @@ cmd+=$(mnist)
 cmd+=$(language)
 
 #printf "$cmd"
-printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
+parallel_launch "$JOBS" "$cmd"
 disable_venv

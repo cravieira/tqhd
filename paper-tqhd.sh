@@ -7,14 +7,21 @@
 # quantization parameters. the purpose of this experiment is to understand how
 # the different intervals and bits parameter choices affect quantization.
 
-set -e
+# How does this script work?
+# This script works by patching a trained MAP float model to TQHD to avoid the
+# burden of retraining the models again. This strategy significantly reduces
+# the script execution time. However, for EMG the training is executed again
+# since it is a "multidataset" and has one model for each subject dataset.
+# Fortunately, its training time is very low compared to the other apps.
+
+set -eu
 
 source common.sh
 
 RESULT_DIR=_transformation # Result dir to be created
 POOL_DIR=_pool # Pool dir to be created
 MAX_SEED=20 # Max number of seeds evaluated
-JOBS=15 # Number of parallel jobs to be executed
+JOBS=16 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 start=1000
 step=1000
@@ -31,7 +38,7 @@ exp_table=(
     '7'
     '8'
 )
-#
+
 # Create the command line used in HDC script models based on the experiment
 # table.
 # $1: Bits
@@ -56,12 +63,16 @@ function create_load_cmd() {
 #$1: Path to python script
 #$2: Output directory of the experiments
 #$3: Path to patched models dir
-#$4: Path to pool dir
+#$4: [Optional] Path to pool dir. If given, then patch model from the trained
+#MAP model pool and evaluates the quantized model on the test dataset.
 function launch() {
     local cmd=$1
     local acc_dir=$2
     declare -a table=("${!3}")
-    local pool_dir=$4
+    local pool_dir=''
+    if [[ $# -eq 4 ]]; then
+        pool_dir=$4
+    fi
 
     for (( seed = 0; seed < $MAX_SEED; seed++ )); do
         for dim in $dimensions ; do
@@ -125,5 +136,5 @@ cmd+=$(mnist)
 cmd+=$(language)
 
 #printf "$cmd"
-printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
+parallel_launch "$JOBS" "$cmd"
 disable_venv
