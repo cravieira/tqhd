@@ -431,7 +431,7 @@ def get_device():
     global _current_pytorch_device
     return _current_pytorch_device
 
-def load_dataset(dataset_dir, F, batch_size=1, transform=None):
+def load_dataset(dataset_dir, F, batch_size=1, transform=None, num_workers=0):
     device = get_device()
     generator = torch.Generator(device=device)
 
@@ -440,6 +440,7 @@ def load_dataset(dataset_dir, F, batch_size=1, transform=None):
             train_ds,
             batch_size=batch_size,
             generator=generator,
+            num_workers=num_workers,
             shuffle=False)
 
     test_ds = F(dataset_dir, train=False, transform=transform, download=True)
@@ -447,6 +448,7 @@ def load_dataset(dataset_dir, F, batch_size=1, transform=None):
             test_ds,
             batch_size=batch_size,
             generator=generator,
+            num_workers=num_workers,
             shuffle=True)
 
     return train_ld, test_ld
