@@ -74,3 +74,4 @@ zipp==3.15.0
 cycler==0.12.1
 matplotlib==3.8.2
 natsort==8.4.0
+torch_geometric=2.5.2
