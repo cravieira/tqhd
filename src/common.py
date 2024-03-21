@@ -678,6 +678,7 @@ def test_hdc(model, test_ld, num_classes, device):
     with torch.no_grad():
         for samples, labels in tqdm(test_ld, desc='Testing'):
             samples = samples.to(device)
+            labels = labels.to(device)
 
             outputs = model(samples)
             outputs = outputs.type(torch.float)
