@@ -133,12 +133,13 @@ def add_default_arguments(parser: ArgumentParser):
             )
 
     parser.add_argument(
-            '--retrain-no-cache',
+            '--retrain-cache',
             action='store_true',
             default=False,
-            help='Disable retrain in-memory cache of encoded samples. The cache'
-            'is enabled by default and can substantially increase retraining'
-            'speed at the cost of memory.'
+            help='Enable retrain in-memory cache of encoded samples. The cache'
+            'is disabled by default and can substantially increase retraining'
+            'speed at the cost of memory. This strategy is better suitted to'
+            'CPU execution.'
             )
 
     return parser
@@ -573,7 +574,7 @@ def train_hdc(
         retrain_rounds=0,
         test_ld=None,
         retrain_best: bool=False,
-        retrain_no_cache: bool=False,
+        retrain_cache: bool=False,
         gen_retrain_dump_acc: Optional[Generator[str, None, None]] = None
         ):
     """
@@ -589,7 +590,9 @@ def train_hdc(
     :param retrain_rounds: Number of retrain rounds. Defaults to 0 (no retraining).
     :param test_ld: Test/Validation dataset to evaluate accuracy at each retraining.
     :param retrain_best: Returns the best trained model considering accuracy on test_ld.
-    :param retrain_no_cache: Disable in-memory cache of the training dataset.
+    :param retrain_cache: Enable in-memory cache of encoded samples of the
+    training dataset. It can substantially increase retraining speed at the
+    cost of high RAM consumption.
     :param gen_retrain_dump_acc: A generator function that returns the path to
     dump the accuracy of of a retrained model on the "test_ld" dataset parameter.
     """
@@ -628,15 +631,15 @@ def train_hdc(
                 labels = labels.to(device)
 
                 # samples_hv could be stored in a list to avoid encoding it again in retraining
-                if not retrain or retrain_no_cache:
-                    samples_hv = model.encode(samples)
-                else:
+                if retrain and retrain_cache:
                     samples_hv = samples
+                else:
+                    samples_hv = model.encode(samples)
 
                 model.am.update(samples_hv, labels, retrain=retrain)
 
                 # Cache the encoded HV and labels to increase retraining speed
-                if not retrain and not retrain_no_cache:
+                if not retrain and retrain_cache:
                     # Store the tensors in CPU to avoid keeping the entire
                     # dataset in the GPU if 'cuda' is being used.
                     # Update: Remove this due to high GPU memory usage when
@@ -714,7 +717,7 @@ def args_train_hdc(args, model, train_ld, test_ld=None):
             args.device,
             retrain_rounds=args.retrain_rounds,
             retrain_best=args.retrain_best,
-            retrain_no_cache=args.retrain_no_cache,
+            retrain_cache=args.retrain_cache,
             test_ld=test_ld,
             gen_retrain_dump_acc=retrain_acc_dumper)
 
