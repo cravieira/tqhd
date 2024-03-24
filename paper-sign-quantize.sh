@@ -7,7 +7,7 @@
 
 set -eu
 
-source script/common-deviation.sh
+source script/common-sign-quantize.sh
 
 JOBS=10 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
@@ -18,7 +18,8 @@ cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(graphhd)
 
 #printf "$cmd"
-printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
+parallel_launch "$JOBS" "$cmd"
 disable_venv

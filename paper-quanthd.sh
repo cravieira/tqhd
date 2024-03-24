@@ -21,7 +21,7 @@ step=1000
 stop=10000
 DIMENSIONS=$(seq $start $step $stop)
 
-RETRAINING=15 # Number of retraining iterations evaluated
+RETRAINING=10 # Number of retraining iterations evaluated
 
 # Adopt learning rate equal to 0.05 as it provides best accuracy as stated in
 # QuantHD's paper, Section II B.
@@ -48,7 +48,6 @@ function launch() {
             local acc_file="$acc_dir/$model_name"
             local retrain_acc_dumper="--retrain-dump-acc $acc_dir/r"
             local retrain_acc_suf="--retrain-dump-acc-suffix /d$dim/$seed.acc "
-            #TODO Ajeitar o suffix e o dumper. Passar o dim para o suffix
             local retrain_accs="$retrain_acc_dumper $retrain_acc_suf"
             local save_cmd=""
             if [[ "$pool_dir" ]] ; then
@@ -96,12 +95,29 @@ function language() {
     echo "\n"
 }
 
+function graphhd() {
+    local app="graphhd-dd"
+    local acc_dir="$RESULT_DIR/$app/hdc/quanthdbin"
+    local pool_dir="$POOL_DIR/$app/hdc/quanthdbin"
+    local dataset="DD"
+
+    # Ensure CPU usage in this app since CUDA might consume a lot of GPU RAM
+    local old_device="$DEVICE"
+    DEVICE='cpu'
+    launch "src/graphhd.py --dataset $dataset" "$acc_dir" "$pool_dir"
+    # Restore previous device used
+    DEVICE="$old_device"
+
+    echo "\n"
+}
+
 enable_venv
 cmd=""
 cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(graphhd)
 #printf "$cmd"
 parallel_launch "$JOBS" "$cmd"
 

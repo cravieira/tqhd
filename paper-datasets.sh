@@ -9,4 +9,5 @@ py_launch "src/voicehd_hdc.py"
 py_launch "src/mnist_hdc.py"
 py_launch "src/language.py"
 py_launch "src/emg.py"
+py_launch "src/graphhd.py --dataset DD"
 disable_venv

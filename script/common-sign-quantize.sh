@@ -5,7 +5,7 @@
 # using Sign Quantization. The purpose of this experiment is to understand how
 # the this naive quantization approach affects accuracy of the models.
 
-set -e
+set -eu
 
 source common.sh
 
@@ -62,5 +62,19 @@ function language() {
     local app="language"
     local acc_dir="$RESULT_DIR/$app/hdc/signquantize"
     launch "src/language.py " "$acc_dir"
+    echo "\n"
+}
+
+function graphhd() {
+    local app="graphhd-dd"
+    local acc_dir="$RESULT_DIR/$app/hdc/signquantize"
+    local dataset="DD"
+
+    # Ensure CPU usage in this app since CUDA might consume a lot of GPU RAM
+    local old_device="$DEVICE"
+    DEVICE='cpu'
+    launch "src/graphhd.py --dataset $dataset" "$acc_dir"
+    DEVICE="$old_device"
+
     echo "\n"
 }

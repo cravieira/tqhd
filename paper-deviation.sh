@@ -17,7 +17,8 @@ cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(graphhd)
 
 #printf "$cmd"
-printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
+parallel_launch "$JOBS" "$cmd"
 disable_venv

@@ -86,12 +86,29 @@ function language() {
     echo "\n"
 }
 
+function graphhd() {
+    local app="graphhd-dd"
+    local acc_dir="$RESULT_DIR/$app/hdc/pqhdc"
+    local pool_dir="$POOL_DIR/$app/hdc/pqhdc"
+    local dataset="DD"
+
+    # Ensure CPU usage in this app since CUDA might consume a lot of GPU RAM
+    local old_device="$DEVICE"
+    DEVICE='cpu'
+    launch "src/graphhd.py --dataset $dataset" "$acc_dir" "$pool_dir"
+    # Restore previous device used
+    DEVICE="$old_device"
+
+    echo "\n"
+}
+
 enable_venv
 cmd=""
 cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(graphhd)
 
 #printf "$cmd"
 parallel_launch "$JOBS" "$cmd"
