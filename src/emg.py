@@ -140,7 +140,7 @@ def experiment(args, am_args, subjects=[0], device="cpu"):
             test_ld=test_ld,
             retrain_rounds=args.retrain_rounds,
             retrain_best=args.retrain_best,
-            retrain_no_cache=args.retrain_no_cache,
+            retrain_cache=args.retrain_cache,
             gen_retrain_dump_acc=retrain_acc_dumper
             )
     accuracy = common.test_hdc(model, test_ld, num_classes, device)
