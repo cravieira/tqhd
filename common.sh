@@ -32,6 +32,6 @@ function parallel_launch() {
     # Clean up temp file if script fails
     trap "rm $PROCFILE" QUIT TERM PWR EXIT
 
-    echo "$JOBS" > $PROCFILE
+    echo "$jobs" > $PROCFILE
     printf "$cmds" | parallel --verbose -j"$PROCFILE" --halt now,fail=1
 }
