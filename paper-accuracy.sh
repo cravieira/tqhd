@@ -109,6 +109,16 @@ function language() {
     echo "\n"
 }
 
+function hdchog() {
+    local app="hdchog-fashionmnist"
+    local acc_dir="$RESULTS_DIR/$app/hdc"
+    local model_dir="$POOL_DIR/$app/hdc"
+    local dataset="FashionMNIST"
+    launch_hdc_table "src/hdchog.py --dataset $dataset" "$acc_dir" exp_table[@] "$model_dir"
+
+    echo "\n"
+}
+
 function graphhd() {
     local app="graphhd-dd"
     local acc_dir="$RESULTS_DIR/$app/hdc"
@@ -124,12 +134,14 @@ function graphhd() {
     echo "\n"
 }
 
+
 enable_venv
 cmd=""
 cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(hdchog)
 cmd+=$(graphhd)
 
 #printf "$cmd"

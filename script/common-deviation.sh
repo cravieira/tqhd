@@ -138,6 +138,17 @@ function language() {
     echo "\n"
 }
 
+function hdchog() {
+    local app="hdchog-fashionmnist"
+    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local pool_dir="$POOL_DIR/$app/hdc"
+    local dataset="FashionMNIST"
+
+    launch_hdc_table "src/hdchog.py --dataset $dataset" "$acc_dir" exp_table[@] "$pool_dir"
+
+    echo "\n"
+}
+
 function graphhd() {
     local app="graphhd-dd"
     local acc_dir="$RESULT_DIR/$app/hdc/deviation"

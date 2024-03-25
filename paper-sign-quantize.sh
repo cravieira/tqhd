@@ -18,6 +18,7 @@ cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(hdchog)
 cmd+=$(graphhd)
 
 #printf "$cmd"

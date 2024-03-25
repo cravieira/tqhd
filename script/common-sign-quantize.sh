@@ -65,6 +65,16 @@ function language() {
     echo "\n"
 }
 
+function hdchog() {
+    local app="hdchog-fashionmnist"
+    local acc_dir="$RESULT_DIR/$app/hdc/signquantize"
+    local dataset="FashionMNIST"
+
+    launch "src/hdchog.py --dataset $dataset" "$acc_dir"
+
+    echo "\n"
+}
+
 function graphhd() {
     local app="graphhd-dd"
     local acc_dir="$RESULT_DIR/$app/hdc/signquantize"
