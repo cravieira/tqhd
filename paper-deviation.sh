@@ -13,12 +13,12 @@ DEVICE=cuda # Device used
 
 enable_venv
 cmd=""
-cmd+=$(voicehd)
-cmd+=$(emg)
-cmd+=$(mnist)
-cmd+=$(language)
-cmd+=$(hdchog)
-cmd+=$(graphhd)
+#cmd+=$(voicehd)
+#cmd+=$(emg)
+#cmd+=$(mnist)
+#cmd+=$(language)
+#cmd+=$(hdchog)
+cmd+=$(com_graphhd)
 
 #printf "$cmd"
 parallel_launch "$JOBS" "$cmd"

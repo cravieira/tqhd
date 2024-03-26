@@ -38,7 +38,6 @@ def load_dataset(dataset_dir, dataset, batch_size=1, apply_transform=False):
         return DatasetTuple(sample), sample.y
 
     transform = _transform if apply_transform else None
-    #graphs = TUDataset(dataset_dir, dataset, transform=transform)
     graphs = TUDataset(dataset_dir, dataset, transform=transform)
     train_size = int(0.7 * len(graphs))
     test_size = len(graphs) - train_size

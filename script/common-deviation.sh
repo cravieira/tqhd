@@ -149,17 +149,17 @@ function hdchog() {
     echo "\n"
 }
 
-function graphhd() {
-    local app="graphhd-dd"
+# Launch GraphHD experiment for a given dataset.
+# $1: Name of the dataset. Must be one of the dataset options avaible in
+#   graphhd.py
+function graphhd_dataset() {
+    local dataset="$1"
+    local lower_case_ds=$(com_to_lowercase "$dataset")
+    local app="graphhd-$lower_case_ds"
     local acc_dir="$RESULT_DIR/$app/hdc/deviation"
     local pool_dir="$POOL_DIR/$app/hdc"
-    local dataset="DD"
 
-    # Ensure CPU usage in this app since CUDA might consume a lot of GPU RAM
-    local old_device="$DEVICE"
-    DEVICE='cpu'
     launch_hdc_table "src/graphhd.py --dataset $dataset" "$acc_dir" exp_table[@] "$pool_dir"
-    DEVICE="$old_device"
 
     echo "\n"
 }
