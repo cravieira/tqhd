@@ -69,6 +69,14 @@ def make_latex_equation(t: str) -> str:
 def str_replace(t: str, pattern: str, to: str) -> str:
     return t.replace(pattern, to)
 
+def print_labeled(array, labels: List[str]):
+    if len(array) != len(labels):
+        raise RuntimeError('Attempt to print labeled data with diferent'
+            ' unequal number of labels')
+    for val, label in zip(array, labels):
+        print(f'{label}: {val}')
+
+
 def select_bits(data, labels):
     '''
     The functions in this script parse all experiments executed for each
@@ -675,7 +683,7 @@ def figure_error_deviation(dim=1000, suplementary=False):
         path=path+'.png'
     )
 
-    def _find_max_diff(data):
+    def _find_max_diff(data, app_names: List[str]):
         '''
         In the paper, we claim that choose P=[-1, 1] is a good choice since it
         provides good accuracy compared to the best possible. This function
@@ -686,40 +694,34 @@ def figure_error_deviation(dim=1000, suplementary=False):
         # goes from [0.1, 2.0]
         ind_1 = 9
 
-        # All data is a 4D array in the shape:
-        # [app][bit][deviation][seed]
-        all_data = np.array(data) # Ensure data is a numpy array
-
-        ## Compute the mean accuracy loss of all seeds to collapse the last dimension
-        #mean_data = np.mean(all_data, axis=-1)
-
-        # In the paper, we claim that B2 suffers the biggest accuracy fluctuation when choosing P. Discard all other bits and delete the dimension. New shape [app][deviation]
+        # In the paper, we claim that B2 suffers the biggest accuracy
+        # fluctuation when choosing P. Discard all other bits and delete the
+        # dimension. New shape [app][deviation]
         b2_data = data[:, 0, :]
 
         # Get the acc loss when P=\sigma
         claim_data = b2_data[:, ind_1]
         best_data = np.min(b2_data, axis=-1)
+
         print('--- Plot deviation claim ---')
         print('In the paper, we claim that choosing P=[-1std, 1std] is a good '
               'choice. Printing the difference between choosing 1std and the '
-              'best possible for B=2')
-        print('P = 1std:', claim_data)
-        print('Best P:', best_data)
-        print('Difference:', best_data - claim_data)
+              'best possible for B=2.')
+        print('P = 1std:')
+        print_labeled(claim_data, app_names)
+        print('Best P:')
+        print_labeled(best_data, app_names)
+        print('Difference:')
+        print_labeled(best_data-claim_data, app_names)
 
-    def _find_p1_progression(data):
+    def _find_p1_progression(data, app_names: List[str]):
         # The 1.0 result is the 9th index in the deviation dimension since it
         # goes from [0.1, 2.0]
         ind_1 = 9
 
-        # All data is a 3D array in the shape:
-        # [app][bit][deviation]
-        #all_data = np.array(data) # Ensure data is a numpy array
-
-        ## Compute the mean accuracy loss of all seeds to collapse the last dimension
-        #mean_data = np.mean(all_data, axis=-1)
-
-        # In the paper, we claim that B4> does not change accuracy significantly for P=1 sigma. Discard all other values of P. New shape [app][bits]
+        # In the paper, we claim that B4> does not change accuracy
+        # significantly for P=1 sigma. Discard all other values of P. New shape
+        # [app][bits]
         all_bits = data[:, :, ind_1]
 
         # Compute accuracy loss drop when increasing bits B
@@ -727,13 +729,16 @@ def figure_error_deviation(dim=1000, suplementary=False):
 
         # Get the acc loss when P=\sigma
         print('--- Plot deviation claim ---')
-        print('In the paper, we claim that choosing B>4 result in diminishing gains')
-        print(diff_bits)
+        print('In the paper, we claim that choosing B>4 result in diminishing '
+              'gains. Each entry represents the accuracy difference of '
+              'B_{i+1}-B{i}. For instance, the first entry for any application '
+              'is B3-B2, and so on.')
+        print_labeled(diff_bits, app_names)
 
     # Find biggest mean between best choice of P and 1.0
     if not suplementary:
-        _find_max_diff(data)
-        _find_p1_progression(data)
+        _find_max_diff(data, APP_PLOT_NAMES)
+        _find_p1_progression(data, APP_PLOT_NAMES)
 
 def plot_dimension(data, dim_range, apps, labels, sq_loss, **kwargs):
     """docstring for plot_dimension"""
@@ -1544,41 +1549,44 @@ def figure_tqhd_vs_all():
             'ncols': len(legend_labels)
         }
     # Make TQHD vs QuantHD
-    plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_quanthd.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
+    #plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_quanthd.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
 
     # TODO: This will need adjustments for the paper discussion
-    #def _scalability(data_tqhd, data_pqhdc):
-    #    '''
-    #    In the paper, we want to show that TQHD provides better accuracy when
-    #    given more resources and to showcase its potential in difficult
-    #    scenarios, i.e., low dimensions and voicehd/mnist.
-    #    '''
-    #    # Ignore language and emg. Create arrays in the shape:
-    #    # [app][bit][dimensions][seed]
-    #    tqhd = np.array(data_tqhd[0:2])
-    #    pqhdc = np.array(data_pqhdc[0:2])
+    def _scalability(data_tqhd, data_pqhdc, data_quanthd):
+        '''
+        In the paper, we want to show that TQHD provides better accuracy when
+        given more resources and to showcase its potential in difficult
+        scenarios, i.e., low dimensions and voicehd/mnist.
+        '''
+        tqhd = data_tqhd
+        pqhdc = data_pqhdc
+        quanthd = data_quanthd
 
-    #    # Get the mean of all seeds and collapse [seed] dimension
-    #    mean_tqhd = np.mean(tqhd, axis=-1)
-    #    mean_pqhdc = np.mean(pqhdc, axis=-1)
+        # Get results only for D=1000 and remove [dimensions]
+        dim_tqhd = tqhd[..., 0]
+        dim_pqhdc = pqhdc[..., 0]
+        dim_quanthd = quanthd[..., 0]
 
-    #    # Get results only for D=1000 and remove [dimensions]
-    #    dim_tqhd = mean_tqhd[..., 0]
-    #    dim_pqhdc = mean_pqhdc[..., 0]
+        # Print acc improvement when increasing bits
+        improvement_tqhd = np.diff(dim_tqhd, axis=-1)
+        improvement_pqhdc = np.diff(dim_pqhdc, axis=-1)
+        improvement_quanthd = np.diff(dim_quanthd, axis=-1)
 
-    #    # Print acc improvement when increasing bits
-    #    improvement_tqhd = np.diff(dim_tqhd, axis=-1)
-    #    improvement_pqhdc = np.diff(dim_pqhdc, axis=-1)
-
-    #    print('TQHD B2 D=1000:')
-    #    print(dim_tqhd)
-    #    print('Improvement TQHD:')
-    #    print(improvement_tqhd)
-    #    print('PQ-HDC B2 D=1000:')
-    #    print(dim_pqhdc)
-    #    print('Improvement PQ-HDC:')
-    #    print(improvement_pqhdc)
-    #_scalability(losses_tqhd, losses_pqhdc)
+        print('TQHD D=1000:')
+        print_labeled(dim_tqhd, APP_PLOT_NAMES)
+        print('Improvement TQHD when increasing B for D=1000 (<0 values mean accuracy loss reduction):')
+        print_labeled(improvement_tqhd, APP_PLOT_NAMES)
+        print('PQ-HDC D=1000:')
+        print_labeled(dim_pqhdc, APP_PLOT_NAMES)
+        print('Improvement PQ-HDC when increasing B for D=1000 (<0 values mean accuracy loss reduction):')
+        print_labeled(improvement_pqhdc, APP_PLOT_NAMES)
+        print('QuantHD D=1000:')
+        print_labeled(dim_quanthd, APP_PLOT_NAMES)
+        print('Improvement QuantHD when increasing B for D=1000 (<0 values mean accuracy loss reduction):')
+        print_labeled(improvement_quanthd, APP_PLOT_NAMES)
+        print('TQHD (B2) - QuantHD (Rmax) for D=1K. <0 results indicate that TQHD is better.')
+        print_labeled(dim_tqhd[:,0]-dim_quanthd[:,-1], APP_PLOT_NAMES)
+    _scalability(losses_tqhd, losses_pqhdc, losses_quanthdbin)
 
 def figure_noise():
     """docstring for figure_noise"""
