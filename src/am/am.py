@@ -282,7 +282,7 @@ class AMThermometer(AMMap):
     """
 
     class TableType(Enum):
-        BaseZero = auto(),
+        BaseZero = auto()
         BandMatrix = auto()
 
     def __init__(
@@ -298,6 +298,9 @@ class AMThermometer(AMMap):
         self.possible_encodings = bits + 1
         if intervals > self.possible_encodings:
             raise RuntimeError(f'Number of intervals ({intervals}) is too big for the number of bits given ({bits}). Only {self.possible_encodings} are possible.')
+
+        if enc_table_type not in self.TableType:
+            raise RuntimeError(f'The parameter "enc_table_type" must be one of the table types defined in this class.')
 
         super().__init__(dim, num_classes, dtype, device, **kwargs)
         self.bits = bits

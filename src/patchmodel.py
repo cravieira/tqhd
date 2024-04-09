@@ -30,6 +30,7 @@ def patch_to_AMThermometerDeviation(am_class, args, am, **kwargs):
             bits=args.am_bits,
             intervals=args.am_intervals,
             deviation=args.am_tqhd_deviation,
+            enc_table_type=args.am_tqhd_encode_table,
             **kwargs,
         )
 

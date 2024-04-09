@@ -1,5 +1,6 @@
 import argparse
 from argparse import ArgumentParser
+import enum
 import io
 import itertools
 from pathlib import Path
@@ -21,6 +22,36 @@ def create_path(path: Path):
     Create specified directory hierarchy.
     """
     Path(path).mkdir(parents=True, exist_ok=True)
+
+# This class allows for better Enum handling with argparse. The code was
+# retrieved on https://stackoverflow.com/a/60750535
+class _EnumAction(argparse.Action):
+    """
+    Argparse action for handling Enums
+    """
+    def __init__(self, **kwargs):
+        # Pop off the type value
+        enum_type = kwargs.pop("type", None)
+
+        # Ensure an Enum subclass is provided
+        if enum_type is None:
+            raise ValueError("type must be assigned an Enum when using EnumAction")
+        if not issubclass(enum_type, enum.Enum):
+            raise TypeError("type must be an Enum when using EnumAction")
+
+        # Generate choices from the Enum
+        #kwargs.setdefault("choices", tuple(e.value for e in enum_type))
+        kwargs.setdefault("choices", tuple(e.name for e in enum_type))
+
+        super(_EnumAction, self).__init__(**kwargs)
+
+        self._enum = enum_type
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Convert value back into an Enum
+        #value = self._enum(values)
+        value = self._enum[values]
+        setattr(namespace, self.dest, value)
 
 def add_default_arguments(parser: ArgumentParser):
     """Add default parser arguments used in all scripts"""
@@ -248,12 +279,12 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Choose the multiplier used with the standard deviation when assigning the quantization poles of TQHD. Only positve float values are accepted. Defaults to {default_deviation}.'
             )
 
-    encode_table_dict = AMThermometer.TableType._member_map_
-    default_encode_table = 'BaseZero'
+    default_encode_table = AMThermometer.TableType.BaseZero
     group.add_argument(
             '--am-tqhd-encode-table',
             default=default_encode_table,
-            choices=encode_table_dict.keys(),
+            type=AMThermometerDeviation.TableType,
+            action=_EnumAction,
             help=f'Choose the thermometer encode table used. Defaults to "{default_encode_table}".'
             )
 
@@ -375,7 +406,6 @@ def pick_am_model(
         intervals = kwargs['am_intervals']
         deviation = kwargs['am_tqhd_deviation']
         enc_table = kwargs['am_tqhd_encode_table']
-        enc_table = AMThermometerDeviation.TableType._member_map_[enc_table]
         am = AMThermometerDeviation(dim, num_classes, bits, intervals, deviation, enc_table_type=enc_table, learning=learning, prediction=prediction, **kwargs)
     elif am_type == 'SQ':
         am = AMSignQuantize(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
