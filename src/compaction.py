@@ -135,7 +135,10 @@ def compact_am(am, bits, compaction_bits, min_val=0):
     return compacted_elements
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze and compact a serialized TQHD model.')
+    parser = argparse.ArgumentParser(
+        description='Analyze and compact a serialized TQHD model. This script '
+        'also accepts MAP models and can patch it to TQHD before running using '
+        '"--patch-model".')
     parser.add_argument(
             'model',
             help='Path to model.',
