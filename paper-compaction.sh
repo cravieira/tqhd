@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# Quantize models using TQHD and evaluate them in fault scenarios.
+# Evaluate TQHD compression capabilities
 # This script trains models with dfferent random seeds and then quantize them
 # using TQHD choosing different number of bits. The quantized models
-# are evaluated with different fault rates when making predictions. The
-# purpose of this experiment is to understand how fault-tolerant is TQHD.
+# are evaluated with different compression parameters. The results are saved in
+# a .csv file. The purpose of this experiment is to assess the TQHD compression
+# when using different parameters and matrices.
 
 set -eu
 
@@ -43,7 +44,7 @@ function create_am_cmd() {
     echo "--am-type TQHD --am-bits $bits --am-intervals $intervals --am-tqhd-deviation 1.0"
 }
 
-# Launch TQHD compression experiments. Thi function loads a trained MAP model
+# Launch TQHD compression experiments. This function loads a trained MAP model
 # and converts it to a TQHD model before running compaction.
 #$1: Path to python script
 #$2: Output directory of the experiments
@@ -201,6 +202,6 @@ cmd+=$(mnist)
 cmd+=$(language)
 
 #printf "$cmd"
-printf "$cmd" | parallel --verbose -j$JOBS --halt now,fail=1
+parallel_launch "$JOBS" "$cmd"
 disable_venv
 
