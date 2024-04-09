@@ -28,29 +28,64 @@ def std(t: torch.Tensor):
     return torch.std(t)
 
 def get_statiscs(am: torch.Tensor):
+    # Count the number of contiguous elements
     _, counts = count_contiguous(am)
+    # Transform Pytorch tensors to numpy arrays
     counts = [c.numpy(force=True) for c in counts ]
 
-    np_q1 = partial(np.quantile, q=0.25)
-    np_q3 = partial(np.quantile, q=0.75)
+    # Split the group lengths between 0s and 1s. This is useful to evaluate
+    # better compression on encoding strategies that have a different number of
+    # 0s and 1s such as BandMatrix.
+    def _get_count_of_element(elem, counts, am):
+        elem_counts = []
+        for c, class_hv in zip(counts, am):
+            first_element = 0
+            if class_hv[0] != elem:
+                first_element = 1
 
-    means = [*map(np.mean, counts)]
-    stds = [*map(np.std, counts)]
-    mins = [*map(np.min, counts)]
-    q1s = [*map(np_q1, counts)]
-    medians = [*map(np.median, counts)]
-    q3s = [*map(np_q3, counts)]
-    maxs = [*map(np.max, counts)]
+            desired_count = c[first_element::2]
+            elem_counts.append(desired_count)
 
-    mean = np.mean(means)
-    std = np.mean(stds)
-    min = np.mean(mins)
-    q1 = np.mean(q1s)
-    median = np.mean(medians)
-    q3 = np.mean(q3s)
-    max = np.mean(maxs)
+        return elem_counts
+    counts_0 = _get_count_of_element(0, counts, am)
+    counts_1 = _get_count_of_element(1, counts, am)
 
-    return mean, std, min, q1, median, q3, max
+    headers = [
+        'mean',
+        'std',
+        'min',
+        'q1',
+        'median',
+        'q3',
+        'max',
+        ]
+    def _get_statistics(counts):
+        np_q1 = partial(np.quantile, q=0.25)
+        np_q3 = partial(np.quantile, q=0.75)
+
+        means = [*map(np.mean, counts)]
+        stds = [*map(np.std, counts)]
+        mins = [*map(np.min, counts)]
+        q1s = [*map(np_q1, counts)]
+        medians = [*map(np.median, counts)]
+        q3s = [*map(np_q3, counts)]
+        maxs = [*map(np.max, counts)]
+
+        mean = np.mean(means)
+        std = np.mean(stds)
+        min = np.mean(mins)
+        q1 = np.mean(q1s)
+        median = np.mean(medians)
+        q3 = np.mean(q3s)
+        max = np.mean(maxs)
+
+        return mean, std, min, q1, median, q3, max
+    stats_0 = _get_statistics(counts_0)
+    stats_1 = _get_statistics(counts_1)
+    headers_0 = [h+'_0' for h in headers]
+    headers_1 = [h+'_1' for h in headers]
+
+    return [*stats_0, *stats_1], [*headers_0, *headers_1]
 
 def print_statistics(t: torch.Tensor):
     print('mean:', torch.mean(t, dtype=torch.float))
@@ -113,17 +148,21 @@ def compact_am(am, bits, compaction_bits, min_val=0):
     '''
     _, counts = count_contiguous(am)
     f = partial(compact_vector, bits=bits, compaction_bits=compaction_bits, min_val=min_val, )
+    # Compacted vectors has shape [<am classes>, <variable>]. Each 1D array in
+    # compacted_vectors is an array of numbers, where each number is the length
+    # of a symbol.
     compacted_vectors = list(map(f, counts))
 
     original_size = am.numel()
 
-    # Get the size of each compacted vector
-    compacted_sizes = map(len, compacted_vectors)
+    # Get the number of elements in each compacted vector
+    compacted_sizes = list(map(len, compacted_vectors))
     # Get the number of elements in the compacted list
     # Accumulate the sizes
     acc = lambda a, b: a+b
     compacted_elements = reduce(acc, compacted_sizes)
-    # Get the compacted size in bits
+    # The size in bits of a compacted AM is the number of elements in the
+    # compacted AM * the size of each element in bits.
     compacted_size = compacted_elements * compaction_bits
 
     #print(f'Original size: {original_size}')
@@ -186,7 +225,7 @@ def main():
         subject_am = flip_blocks(am, bits)
     c_elem = compact_am(subject_am, bits, c_bits, min_val=0)
 
-    stats = get_statiscs(subject_am)
+    stats, stats_headers = get_statiscs(subject_am)
 
     # Dimensions in the unquantized MAP model
     map_dim = am.shape[-1]/bits
@@ -203,15 +242,17 @@ def main():
             # Bit groups statistics. Each vector in a PQHD AM is formed by
             # thermometer encoded words which have contiguous groups of 0s and
             # 1s. The exported CSV contains statistics considering the length
-            # of these groups.
-            # Bit group length stats
-            'mean', # Mean length of bit groups
-            'std', # Standard deviation
-            'min', # Min length of a bit group
-            'q1', # First quantile
-            'median', # Median of the length
-            'q3', # Third quantile
-            'max' # Max length of a bit group
+            # of these groups. The length stats are dumped for each symbol, 0
+            # and 1.
+            # Bit group length stats:
+            #'mean', # Mean length of bit groups
+            #'std', # Standard deviation
+            #'min', # Min length of a bit group
+            #'q1', # First quantile
+            #'median', # Median of the length
+            #'q3', # Third quantile
+            #'max' # Max length of a bit group
+            *stats_headers
             ]
     data = [
             am_classes,
