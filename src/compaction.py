@@ -137,6 +137,8 @@ def compact_vector(vector, bits, compaction_bits, min_val=0):
             while left > 0:
                 bits_compacted = min(left,max_val)
                 compacted.append(bits_compacted)
+                if left <= 0:
+                    break
                 compacted.append(min_val)
                 left -= bits_compacted
 
