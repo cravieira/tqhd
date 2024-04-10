@@ -222,11 +222,11 @@ def compress(hyper_vector, symbol_0_size, symbol_1_size, min_val=0):
     total_size = sizes_0 + sizes_1
     return total_size
 
-def compact_am(am, bits, compaction_bits, min_val=0):
+def compact_am(am, symbol_0_size, symbol_1_size, min_val=0):
     '''
     Returns the number of elements in the compacted AM.
     '''
-    f = partial(compress, symbol_0_size=compaction_bits, symbol_1_size=compaction_bits, min_val=min_val, )
+    f = partial(compress, symbol_0_size=symbol_0_size, symbol_1_size=symbol_1_size, min_val=min_val, )
     # Compacted vectors has shape [<am classes>, total size]. Each 1D array in
     # compacted_vectors is the size of the compressed vector
     compacted_sizes = list(map(f, am))
@@ -252,11 +252,18 @@ def main():
             help='Patch the loaded model before compaction.')
 
     parser.add_argument(
-            '-c',
-            '--compaction-bits',
+            '-c0',
+            '--compaction-bits0',
             required=True,
             type=int,
-            help='Number of bits used in compaction.',
+            help='Number of bits used in compaction of symbol 0.',
+            )
+    parser.add_argument(
+            '-c1',
+            '--compaction-bits1',
+            required=True,
+            type=int,
+            help='Number of bits used in compaction of symbol 1.',
             )
     parser.add_argument(
             '--csv',
@@ -274,7 +281,8 @@ def main():
 
     args = parser.parse_args()
 
-    c_bits = args.compaction_bits
+    c0_bits = args.compaction_bits0
+    c1_bits = args.compaction_bits1
 
     model = common.load_model(args.model)
     if args.patch_model:
@@ -286,7 +294,7 @@ def main():
     subject_am = am
     if not args.no_interleave:
         subject_am = flip_blocks(am, bits)
-    comp_am_size = compact_am(subject_am, bits, c_bits, min_val=0)
+    comp_am_size = compact_am(subject_am, args.compaction_bits0, args.compaction_bits1, min_val=0)
 
     stats, stats_headers = get_statiscs(subject_am)
 
@@ -299,7 +307,8 @@ def main():
             'map_dim', # Number of dimensions in the unquantized AM
             'tqhd_b', # Number of bits used TQHD quantization
             'tqhd_am_size', # Size of uncompressed TQHD AM in bits
-            'comp_c', # Number of bits used in compacted words
+            'compaction_bits_0', # Number of bits used in compacted words for symbol 0
+            'compaction_bits_1', # Number of bits used in compacted words for symbol 1
             #'comp_elems', # Number of elements in compacted AM
             'comp_am_size', # Size of compressed AM in bits
             # Bit groups statistics. Each vector in a PQHD AM is formed by
@@ -322,7 +331,8 @@ def main():
             map_dim,
             bits,
             tqhd_am_size,
-            c_bits,
+            c0_bits,
+            c1_bits,
             #c_elem,
             comp_am_size,
             *stats]
