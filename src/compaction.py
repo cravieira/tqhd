@@ -128,7 +128,7 @@ def count_contiguous(t: torch.Tensor):
 def compact_vector(vector, bits, compaction_bits, min_val=0):
     compacted = []
     #min_val = min_val
-    max_val = (compaction_bits**2)-1+min_val
+    max_val = (2**compaction_bits)-1+min_val
     for elem in vector:
         if elem <= max_val:
             compacted.append(elem.item())
