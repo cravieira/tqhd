@@ -115,9 +115,11 @@ def flip_blocks(t: torch.Tensor, block_size: int):
     return ret
 
 def count_contiguous(t: torch.Tensor):
-    '''
-    Count the number of contiguous elements in the given tensor.
-    '''
+    """
+    Count the number of contiguous elements in the given 2D tensor along dim=1.
+
+    :param t: A 2D tensor.
+    """
     count_1D = partial(torch.unique_consecutive, return_counts=True)
     ret1, ret2 = tee(map(count_1D, t))
     outputs, counts = [e[0] for e in ret1], [e[1] for e in ret2]
@@ -125,55 +127,114 @@ def count_contiguous(t: torch.Tensor):
     #outputs, counts = torch.unique_consecutive(t, dim=1, return_counts=True)
     return outputs, counts
 
-def compact_vector(vector, bits, compaction_bits, min_val=0):
+# Return the size of a RLE compression of vectors containing only two symbols.
+# It is possible to specify a different number of bits for each symbol.
+def binary_rle(
+        vector,
+        symbol_0_size: int,
+        symbol_1_size: int,
+        first_symbol: int,
+        min_val: int=0
+    ):
+    """
+    Given a vector of lengths of only two symbols, i.e., "0" and "1", compute
+    the run length encoding considering each symbol size.
+
+    :param vector [TODO:type]: [TODO:description]
+    :param symbol_0_size: Number of bits for each symbol "0". Must be > 0.
+    :param symbol_1_size: Number of bits for each symbol "1". Must be > 0.
+    :param first_symbol: The first symbol in the vector of lengths, either "0" or "1".
+    :param min_val: Placeholder variable for min lengths. This argument is currently ignored.
+    :raises RuntimeError: Raises an exception if "symbol_0_size" or "symbol_1_size" are <= 0.
+    """
+    if symbol_0_size <= 0 or symbol_1_size <=0:
+        raise RuntimeError(f'Symbol sizes must be at least 1. Given: {symbol_0_size} and {symbol_1_size}')
+
     compacted = []
-    #min_val = min_val
-    max_val = (2**compaction_bits)-1+min_val
-    for elem in vector:
-        if elem <= max_val:
-            compacted.append(elem.item())
+    max_0_val = (2**symbol_0_size)-1+min_val
+    max_1_val = (2**symbol_1_size)-1+min_val
+
+    # Set variables according to the first element
+    current_symbol = 0
+    current_size = symbol_0_size
+    max_val = max_0_val
+    if first_symbol:
+        current_symbol = 1
+        current_size = symbol_1_size
+        max_val = max_1_val
+
+    def _swap_symbol():
+        """
+        Swap the current symbol being analyzed by swapping the outer function's
+        variables.
+        """
+        nonlocal current_symbol, current_size, symbol_0_size, symbol_1_size
+        if current_symbol:
+            current_symbol = 0
+            current_size = symbol_0_size
+            max_val = max_0_val
         else:
-            left = elem.item()
+            current_symbol = 1
+            current_size = symbol_1_size
+            max_val = max_1_val
+
+    for elem in vector:
+        length = elem.item()
+        if elem <= max_val:
+            compacted.append(length)
+
+            _swap_symbol()
+        else:
+            left = length
             while left > 0:
-                bits_compacted = min(left,max_val)
+                bits_compacted = min(left, max_val)
                 compacted.append(bits_compacted)
+                _swap_symbol()
+
+                left -= bits_compacted
+                # Check if the last part of the length was compressed
                 if left <= 0:
                     break
                 compacted.append(min_val)
-                left -= bits_compacted
+                _swap_symbol()
 
     return compacted
+
+def compress(hyper_vector, symbol_0_size, symbol_1_size, min_val=0):
+    """docstring for compress"""
+    hv = hyper_vector.reshape(1, -1)
+    _, contiguous = count_contiguous(hv)
+    contiguous = contiguous[0]
+    first_element = hyper_vector[0]
+    rle_lengths = binary_rle(contiguous, symbol_0_size, symbol_1_size, first_symbol=first_element, min_val=min_val)
+
+    # Compute how many bits are necessary for each symbol
+    rle_lengths = np.array(rle_lengths)
+    if first_element == 0:
+        lengths_0 = rle_lengths[0::2]
+        lengths_1 = rle_lengths[1::2]
+    else:
+        lengths_0 = rle_lengths[1::2]
+        lengths_1 = rle_lengths[0::2]
+
+    sizes_0 = len(lengths_0) * symbol_0_size
+    sizes_1 = len(lengths_1) * symbol_1_size
+    total_size = sizes_0 + sizes_1
+    return total_size
 
 def compact_am(am, bits, compaction_bits, min_val=0):
     '''
     Returns the number of elements in the compacted AM.
     '''
-    _, counts = count_contiguous(am)
-    f = partial(compact_vector, bits=bits, compaction_bits=compaction_bits, min_val=min_val, )
-    # Compacted vectors has shape [<am classes>, <variable>]. Each 1D array in
-    # compacted_vectors is an array of numbers, where each number is the length
-    # of a symbol.
-    compacted_vectors = list(map(f, counts))
+    f = partial(compress, symbol_0_size=compaction_bits, symbol_1_size=compaction_bits, min_val=min_val, )
+    # Compacted vectors has shape [<am classes>, total size]. Each 1D array in
+    # compacted_vectors is the size of the compressed vector
+    compacted_sizes = list(map(f, am))
 
-    original_size = am.numel()
-
-    # Get the number of elements in each compacted vector
-    compacted_sizes = list(map(len, compacted_vectors))
-    # Get the number of elements in the compacted list
     # Accumulate the sizes
     acc = lambda a, b: a+b
-    compacted_elements = reduce(acc, compacted_sizes)
-    # The size in bits of a compacted AM is the number of elements in the
-    # compacted AM * the size of each element in bits.
-    compacted_size = compacted_elements * compaction_bits
-
-    #print(f'Original size: {original_size}')
-    ##print(f'Compacted size {compaction_bits}*{len(compacted)}:', compacted_size)
-    #print(f'Compacted size:', compacted_size)
-    #improvement = ((original_size/compacted_size)-1)*100
-    #print(f'Improvement: {improvement:.2f}%')
-
-    return compacted_elements
+    compacted_size = reduce(acc, compacted_sizes)
+    return compacted_size
 
 def main():
     parser = argparse.ArgumentParser(
@@ -225,21 +286,21 @@ def main():
     subject_am = am
     if not args.no_interleave:
         subject_am = flip_blocks(am, bits)
-    c_elem = compact_am(subject_am, bits, c_bits, min_val=0)
+    comp_am_size = compact_am(subject_am, bits, c_bits, min_val=0)
 
     stats, stats_headers = get_statiscs(subject_am)
 
     # Dimensions in the unquantized MAP model
     map_dim = am.shape[-1]/bits
     tqhd_am_size = am_classes*bits*map_dim
-    comp_am_size = c_elem * c_bits
+    #comp_am_size = c_elem * c_bits
     header = [
             'am_classes', # Number of classes for this application
             'map_dim', # Number of dimensions in the unquantized AM
             'tqhd_b', # Number of bits used TQHD quantization
             'tqhd_am_size', # Size of uncompressed TQHD AM in bits
             'comp_c', # Number of bits used in compacted words
-            'comp_elems', # Number of elements in compacted AM
+            #'comp_elems', # Number of elements in compacted AM
             'comp_am_size', # Size of compressed AM in bits
             # Bit groups statistics. Each vector in a PQHD AM is formed by
             # thermometer encoded words which have contiguous groups of 0s and
@@ -262,7 +323,7 @@ def main():
             bits,
             tqhd_am_size,
             c_bits,
-            c_elem,
+            #c_elem,
             comp_am_size,
             *stats]
     if len(header) != len(data):
@@ -280,3 +341,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
