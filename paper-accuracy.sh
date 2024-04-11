@@ -83,8 +83,9 @@ function voicehd() {
 function emg() {
     local app="emg"
 
-    # Run EMG on all subjects available in the dataset
-    local acc_dir="$RESULTS_DIR/$app/hdc/all"
+    # Run EMG on all subjects available in the dataset. The results os
+    # "emg-all" contain the mean of all subjects.
+    local acc_dir="$RESULTS_DIR/$app-all/hdc"
     launch_hdc_table "src/emg.py" "$acc_dir" exp_table[@]
 
     echo "\n"
