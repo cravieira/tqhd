@@ -71,7 +71,7 @@ function launch_patched() {
                 # TQHD before running compaction.
                 # Quantize a trained MAP model to TQHD and estimate its compaction.
                 local map_model="$pool_dir/map/encf32-amf32/d$dim/$seed.pt"
-                echo "py_launch src/compaction.py $map_model -c $compaction --csv $csv_path --patch-model --am-type TQHD --am-bits $bit --am-intervals $ints --am-tqhd-deviation 1.0"
+                echo "py_launch src/compaction.py $map_model -c0 $compaction -c1 $compaction --am-tqhd-encode-table BaseZero --csv $csv_path --patch-model --am-type TQHD --am-bits $bit --am-intervals $ints --am-tqhd-deviation 1.0"
             done
         done
     done
@@ -79,108 +79,32 @@ function launch_patched() {
 
 function voicehd() {
     local app="voicehd"
-    local acc_dir="$RESULT_DIR/$app/hdc/compaction/tqhd"
+    local acc_dir="$RESULT_DIR/$app/hdc/compaction/tqhd/BaseZero"
     #launch "src/voicehd_hdc.py" "$acc_dir"
     local model_dir="$POOL_DIR/$app/hdc"
     launch_patched "src/voicehd_hdc.py" "$acc_dir" "$model_dir" exp_table[@]
     echo "\n"
 }
 
-# Create patch command if necessary.
-# $1: Model path
-# $2: Number of bits used in expansion
-# $3: Dimensions
-# $4: Seed
-function patch_model_emg() {
-    local pool_path=$1
-    local bit=$2
-    local dim=$3
-    local seed=$4
-    local cmd=$5
-    local subject=$6
-
-    model="$pool_path/map/encf32-amf32/d$dim/$seed.pt"
-    new_model="$pool_path/tqhd/b$bit/d$dim/$seed.pt"
-    local am_args=$(create_am_cmd $bit)
-    patch_arg="$am_args"
-    # Avoid patching if there is already a patched model. This behavior can be
-    # controlled by "FORCE_PATCH" variable.
-    if [[ $FORCE_PATCH || ! -f $new_model ]]; then
-        ints=$(expr $bit + 1)
-        echo "py_launch $cmd --subject $subject --vector-size $dim --am-type TQHD --am-tqhd-deviation 1.0 --am-bits $bit --am-intervals $ints --seed $seed --save-model $new_model --device $DEVICE"
-    fi
-}
-
-# Patch all models necessary for EMG compression estimation.
-#$1: Path to python script
-#$2: Output directory of the experiments
-#$3: Path to patched models dir
-#$4: Pointer to experiment table
-function patch_emg() {
-    local cmd=$1
-    local acc_dir=$2
-    local pool_dir=$3
-    local -a table=("${!4}")
-
-    for (( subject = 0; subject < 5; subject++)); do
-        for (( seed = 0; seed < $MAX_SEED; seed++ )); do
-            for dim in $DIMENSIONS ; do
-                for (( i = 0; i < ${#table[@]}; i++ )); do
-                    # Split the experiment table into its two variables
-                    IFS=' ' read -r bit compaction <<< ${table[i]}
-                    patch_cmd=$(patch_model_emg "$pool_dir-s$subject" $bit $dim $seed "$cmd" $subject)
-                    if [ "$patch_cmd" ]; then
-                        echo "$patch_cmd"
-                    fi
-                done
-            done
-        done
-    done
-}
-
-# Launch compression experiments for emg.
-# Each emg model is trained for its correspondent dataset subject, quantized,
-# and serialized to file. Then, the serialized model is used for compression.
-#$1: Path to python script
-#$2: Output directory of the experiments
-#$3: Path to patched models dir
-#$4: Pointer to experiment table
-function launch_patched_emg() {
-    local cmd=$1
-    local acc_dir=$2
-    local pool_dir=$3
-    local -a table=("${!4}")
-
-    # Train and serialize all require emg models first before using them.
-    patch_emg "$cmd" "$acc_dir" "$pool_dir" table[@]
-
-    for (( subject = 0; subject < 5; subject++)); do
-        for (( seed = 0; seed < $MAX_SEED; seed++ )); do
-            for dim in $DIMENSIONS ; do
-                for (( i = 0; i < ${#table[@]}; i++ )); do
-                    # Split the experiment table into its two variables
-                    IFS=' ' read -r bit compaction <<< ${table[i]}
-
-                    local patched_model="$pool_dir-s$subject/tqhd/b$bit/d$dim/$seed.pt"
-                    local csv_path="$acc_dir-s$subject/b$bit/d$dim/c$compaction/$seed.csv"
-                    echo "py_launch src/compaction.py $patched_model -c $compaction --csv $csv_path"
-                done
-            done
-        done
-    done
-}
-
 function emg() {
     local app="emg"
     local acc_dir="$RESULT_DIR/$app"
-    local model_dir="$POOL_DIR/$app"
-    launch_patched_emg "src/emg.py" "$acc_dir" "$model_dir" exp_table[@]
+    local pool_dir="$POOL_DIR/$app"
+
+    local subjects=$(seq 0 4)
+    for s in $subjects; do
+        local acc_dir="$RESULT_DIR/$app-s$s/hdc/compaction/BaseZero"
+        local pool_dir="$POOL_DIR/$app-s$s/hdc"
+        launch_patched "src/emg.py --subject $s" "$acc_dir" "$pool_dir" exp_table[@]
+        echo "\n"
+    done
+
     echo "\n"
 }
 
 function mnist() {
     local app="mnist"
-    local acc_dir="$RESULT_DIR/$app/hdc/compaction/tqhd"
+    local acc_dir="$RESULT_DIR/$app/hdc/compaction/BaseZero"
     local model_dir="$POOL_DIR/$app/hdc"
     launch_patched "src/mnist_hdc.py" "$acc_dir" "$model_dir" exp_table[@]
     echo "\n"
@@ -188,7 +112,7 @@ function mnist() {
 
 function language() {
     local app="language"
-    local acc_dir="$RESULT_DIR/$app/hdc/compaction/tqhd"
+    local acc_dir="$RESULT_DIR/$app/hdc/compaction/BaseZero"
     local model_dir="$POOL_DIR/$app/hdc"
     launch_patched "src/language.py" "$acc_dir" "$model_dir" exp_table[@]
     echo "\n"
