@@ -803,20 +803,32 @@ def parse_compaction_app(app_dir: str, dim_range, configs):
         df = pd.concat(data)
         return df
 
-    def _parse_dim_dir(p: Path):
+    def _parse_compresion_bits_dir(p: Path):
         datasets = list(map_sorted_subfolders(p, _parse_compaction_dir))
         dataset = pd.concat(datasets) # Return a single dataframe
 
         return dataset
 
-    def _parse_bit_dir(p: Path):
+    def _parse_dim_dir(p: Path):
+        datasets = list(map_sorted_subfolders(p, _parse_compresion_bits_dir))
+        dataset = pd.concat(datasets) # Return a single dataframe
+
+        return dataset
+
+    def _parse_tqhd_bit_dir(p: Path):
         datasets = list(map_sorted_subfolders(p, _parse_dim_dir))
         dataset = pd.concat(datasets)
+
+        # TODO: Workaround to add execution type information to the dataframe
+        # since compaction.py does not export the type of encoding used and
+        # whether the RLE was interleaved.
+        execution_type = p.stem
+        dataset.insert(0, "execution_type", execution_type)
         return dataset
 
     def _parse_all(p: str):
         path = Path(p)
-        datasets = list(map_sorted_subfolders(path, _parse_bit_dir))
+        datasets = list(map_sorted_subfolders(path, _parse_tqhd_bit_dir))
         dataset = pd.concat(datasets)
 
         return dataset
@@ -827,7 +839,7 @@ def parse_compaction_app(app_dir: str, dim_range, configs):
     # Use information in CSV
     def _calc_compacted_size_improvement(df, keys, dimensions):
         compaction_bits = int(keys[1])
-        query_df = df.query(f'tqhd_b == {keys[0]} & comp_c == {keys[1]}')
+        query_df = df.query(f'execution_type == "{keys[0]}" & tqhd_b == {keys[1]} & compaction_bits_0 == {keys[2]} & compaction_bits_1 == {keys[3]}')
 
         tqhd_am_sizes = query_df['tqhd_am_size'].to_numpy()
         comp_am_sizes = query_df['comp_am_size'].to_numpy()
@@ -851,31 +863,32 @@ def figure_compaction():
 
     configs = [
             # <bits> <compaction-bits>
-            ['3', '3'],
-            ['4', '3'],
-            ['4', '4'],
-            ['5', '4'],
-            ['6', '4'],
-            ['7', '4'],
-            ['8', '4'],
+            ['BaseZero-interleave', '3', '3', '3'],
+            ['BaseZero-interleave', '4', '3', '3'],
+            ['BaseZero-interleave', '4', '4', '4'],
+            ['BaseZero-interleave', '5', '4', '4'],
+            ['BaseZero-interleave', '6', '4', '4'],
+            ['BaseZero-interleave', '7', '4', '4'],
+            ['BaseZero-interleave', '8', '4', '4'],
         ]
 
+    def _parse_compaction_app(app_name: str):
+        path = f'_transformation/{app_name}/hdc/compaction'
+        compaction_rate = parse_compaction_app(path, dim_range, configs)
+        return np.array(compaction_rate)
+
+    def _parse_multidataset_app(app_names: List[str]):
+        compaction_rates = list(map(_parse_compaction_app, app_names))
+        compaction_rates = np.mean(compaction_rates, axis=0)
+        return np.array(compaction_rates)
+
     apps = ['voicehd', 'mnist', 'language']
-    compaction_rates = []
-    for app in apps:
-        path = f'_transformation/{app}/hdc/compaction/tqhd'
-        compaction_rate = parse_compaction_app(path, dim_range, configs)
-        compaction_rates.append(compaction_rate)
-
-    # Parse all EMG's datasets
-    emg_rates = []
-    for i in range(5):
-        path = f'_transformation/emg-s{i}'
-        compaction_rate = parse_compaction_app(path, dim_range, configs)
-        emg_rates.append(compaction_rate)
-    emg_rates = np.mean(emg_rates, axis=0)
-
+    compaction_rates = list(map(_parse_compaction_app, apps))
     compaction_rates = np.array(compaction_rates)
+
+    emg_apps = ['emg-s0', 'emg-s1', 'emg-s2', 'emg-s3', 'emg-s4']
+    emg_rates = _parse_multidataset_app(emg_apps)
+
     compaction_rates = np.vstack((compaction_rates, emg_rates))
     apps.append('emg')
 
@@ -885,7 +898,7 @@ def figure_compaction():
     table = np.transpose(np.vstack((compaction_rates, means)))
 
     headers = [*apps, 'mean']
-    config_labels = [f'$B{b}C{c}$' for b, c in configs]
+    config_labels = [f'$B{tqhd_bits}C{c0_size}$' for execution_type, tqhd_bits, c0_size, c1_size in configs]
     configs_df = pd.DataFrame({'config': config_labels})
 
     table_df = pd.DataFrame(data=table, columns=headers)
