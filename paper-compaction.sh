@@ -168,12 +168,29 @@ function language() {
     echo "\n"
 }
 
+# Launch GraphHD experiment for a given dataset.
+# $1: Name of the dataset. Must be one of the dataset options avaible in
+#   graphhd.py
+function graphhd_dataset() {
+    local dataset="$1"
+    local lower_case_ds=$(com_to_lowercase "$dataset")
+    local app="graphhd-$lower_case_ds"
+    local acc_dir="$RESULT_DIR/$app/hdc/compaction"
+    local pool_dir="$POOL_DIR/$app/hdc"
+
+    launch_patched "src/graphhd.py --dataset $dataset" "$acc_dir" "$pool_dir" exp_table[@]
+
+    echo "\n"
+}
+
+
 enable_venv
 cmd=""
 cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(com_graphhd)
 
 #printf "$cmd"
 parallel_launch "$JOBS" "$cmd"

@@ -2,8 +2,7 @@
 
 # Common variables #
 # GraphHD datasets evaluated
-#GRAPHHD_DATASETS=("DD" "ENZYMES" "MUTAG" "NCI1" "PROTEINS" "PTC_FM")
-GRAPHHD_DATASETS=("ENZYMES" "MUTAG" "NCI1" "PROTEINS" "PTC_FM")
+GRAPHHD_DATASETS=("DD" "ENZYMES" "MUTAG" "NCI1" "PROTEINS" "PTC_FM")
 
 # Python environment management #
 function enable_venv() {
