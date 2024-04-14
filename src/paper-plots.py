@@ -41,7 +41,7 @@ GRAPHHD_DATASETS = [
 ]
 
 # App names as they appear in plots
-APP_PLOT_NAMES= [
+APP_PLOT_NAMES = [
     'voicehd',
     'mnist',
     'language',
@@ -56,8 +56,7 @@ APP_DIR_NAMES = [
     'mnist',
     'language',
     'hdchog-fashionmnist',
-    'emg',
-    'graphhd'
+    'emg-all',
 ]
 
 APP_NAME_STYLE = dict(
@@ -189,6 +188,24 @@ def parse_reference_apps(apps: List[str]) -> NDArray:
 
     accs = np.array(accs)
     return accs
+
+def get_reference_accs():
+    """docstring for parse_reference_apps
+
+    Get reference accuracy of all apps used in all plots.
+    """
+    global APP_DIR_NAMES
+    global GRAPHHD_DATASETS
+
+    apps = APP_DIR_NAMES
+    acc_ref = parse_reference_apps(apps)
+    # Consider the mean of all GraphHD datasets
+    graphhd_acc_all = parse_reference_apps(GRAPHHD_DATASETS)
+    graphhd_acc = np.mean(graphhd_acc_all, axis=0)
+    # acc_ref.shape = [apps, seed]
+    acc_ref = np.vstack((acc_ref, [graphhd_acc]))
+
+    return acc_ref
 
 def figure_histogram(data, sty, legends=None, **kwargs):
     # This function is based on the example available on:
@@ -882,23 +899,28 @@ def figure_compaction():
         compaction_rates = np.mean(compaction_rates, axis=0)
         return np.array(compaction_rates)
 
-    apps = ['voicehd', 'mnist', 'language']
+    app_names = ['voicehd', 'mnist', 'language', 'hdchog', 'emg', 'graphhd']
+
+    apps = ['voicehd', 'mnist', 'language', 'hdchog-fashionmnist']
     compaction_rates = list(map(_parse_compaction_app, apps))
     compaction_rates = np.array(compaction_rates)
 
     emg_apps = ['emg-s0', 'emg-s1', 'emg-s2', 'emg-s3', 'emg-s4']
     emg_rates = _parse_multidataset_app(emg_apps)
-
     compaction_rates = np.vstack((compaction_rates, emg_rates))
-    apps.append('emg')
+
+    global GRAPHHD_DATASETS
+    graphhd_apps = GRAPHHD_DATASETS
+    graphhd_rates = _parse_multidataset_app(graphhd_apps)
+    compaction_rates = np.vstack((compaction_rates, graphhd_rates))
 
     compaction_rates *= 100 # Make percentage
     # Add mean column at the end of array
     means = np.mean(compaction_rates, axis=0).reshape(1, -1)
     table = np.transpose(np.vstack((compaction_rates, means)))
 
-    headers = [*apps, 'mean']
-    config_labels = [f'$B{tqhd_bits}C{c0_size}$' for execution_type, tqhd_bits, c0_size, c1_size in configs]
+    headers = [*app_names, 'mean']
+    config_labels = [f'{execution_type}-$B{tqhd_bits}C_0{c0_size}C_1{c1_size}$' for execution_type, tqhd_bits, c0_size, c1_size in configs]
     configs_df = pd.DataFrame({'config': config_labels})
 
     table_df = pd.DataFrame(data=table, columns=headers)
@@ -937,7 +959,7 @@ def plot_tqhd_vs_pqhdc(
     cm = 1/2.54  # centimeters in inches
     IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
     fig, axs = plt.subplots(
-            nrows=2,
+            nrows=3,
             ncols=2,
             #sharex=True,
             figsize=(IEEE_column_width*2.5, IEEE_column_width*2)
@@ -951,20 +973,18 @@ def plot_tqhd_vs_pqhdc(
         min_y = float('inf')
         #for curve, label in zip(app_data, labels):
         for curve_tqhd, curve_pqhdc, label, color in zip(app_tqhd, app_pqhdc, labels, colors):
-            mean = np.mean(curve_tqhd, axis=1)
             ax.plot(
                 dims,
-                mean,
+                curve_tqhd,
                 label=label,
                 linestyle=tqhd_linestyle,
                 marker=tqhd_marker, # Circle marker
                 color=color
             )
 
-            mean = np.mean(curve_pqhdc, axis=1)
             ax.plot(
                 dims,
-                mean,
+                curve_pqhdc,
                 label=label,
                 linestyle=pqhdc_linestyle,
                 color=color, # Plot both lines with the same color
@@ -1339,11 +1359,7 @@ def figure_tqhd_vs_all():
             'language',
             'hdchog-fashionmnist',
         ]
-    global GRAPHHD_DATASETS
-    acc_ref = parse_reference_apps(apps+['emg-all'])
-    graphhd_acc_all = parse_reference_apps(GRAPHHD_DATASETS)
-    graphhd_acc = np.mean(graphhd_acc_all, axis=0)
-    acc_ref = np.vstack((acc_ref, [graphhd_acc]))
+    acc_ref = get_reference_accs()
 
     def _parse_transformation(transformation_name: str, emg_all: bool=True) -> NDArray:
         acc_apps = parse_transformation_apps(apps, transformation_name)
@@ -1351,7 +1367,7 @@ def figure_tqhd_vs_all():
         acc_graphhd_all = parse_transformation_apps(GRAPHHD_DATASETS, transformation_name)
         acc_graphhd = np.mean(acc_graphhd_all, axis=0)
 
-        # TODO: remove this later
+        # TODO: This can be removed later
         # Make sure all apps for the same transformation have the same number of
         # bits/retraining iterations
         lenghts = map(len, acc_apps)
@@ -1566,7 +1582,8 @@ def figure_tqhd_vs_all():
 
 def figure_noise():
     """docstring for figure_noise"""
-    apps = ['voicehd', 'mnist', 'language']
+    acc_ref = get_reference_accs()
+
     def _parse_dim_dir(path: str):
         accs = parse_accuracy_directory(path)
         return accs
@@ -1581,52 +1598,64 @@ def figure_noise():
         bits = np.array(bits)
         return bits
 
-    def _parse_app(acc_path: str, ref_path: str):
+    def _parse_app(acc_path: str):
         quantized_accs = _parse_app_dir(acc_path)
-        reference_accs = parse_app_reference_dir(ref_path)
 
-        acc_loss = reference_accs - quantized_accs
+        return quantized_accs
 
-        return acc_loss
+    def _parse_transformation(transformation_name: str, emg_all: bool=True) -> NDArray:
+        global APP_DIR_NAMES
+        apps = APP_DIR_NAMES
+        app_paths = [f'_transformation/{app}/hdc/{transformation_name}' for app in apps]
+        acc_apps = list(map(_parse_app, app_paths))
 
-    # Parse TQHD
-    losses_tqhd = []
-    for app in apps:
-        acc_path = f'_transformation/{app}/hdc/paper-fault/tqhd'
-        ref_path = f'_accuracy/{app}/hdc'
-        loss = _parse_app(acc_path, ref_path)
-        losses_tqhd.append(loss)
+        global GRAPHHD_DATASETS
+        apps_graphhd = GRAPHHD_DATASETS
+        graphhd_paths = [f'_transformation/{app}/hdc/{transformation_name}' for app in apps_graphhd]
+        acc_graphhd_all = list(map(_parse_app, graphhd_paths))
+        acc_graphhd = np.mean(acc_graphhd_all, axis=0)
 
-    app = 'emg'
-    loss = _parse_app(
-            f'_transformation/{app}/hdc/all/paper-fault/tqhd',
-            f'_accuracy/{app}/hdc/all'
-            )
-    losses_tqhd.append(loss)
+        ## TODO: This can be removed later
+        ## Make sure all apps for the same transformation have the same number of
+        ## bits/retraining iterations
+        #lenghts = map(len, acc_apps)
+        #min_len = min(lenghts)
+        #min_len = min(min_len, len(acc_graphhd))
+        #acc_apps = [acc[:min_len] for acc in acc_apps]
+        #acc_graphhd = acc_graphhd[:min_len]
 
-    # Parse PQHDC
-    acc_paths = []
-    ref_paths = []
-    for app in apps:
-        acc_path = f'_transformation/{app}/hdc/paper-fault/pqhdc'
-        ref_path = f'_accuracy/{app}/hdc'
-        acc_paths.append(acc_path)
-        ref_paths.append(ref_path)
+        acc_all = np.concatenate((acc_apps, [acc_graphhd]))
 
-    acc_paths.append(f'_transformation/emg/hdc/all/paper-fault/pqhdc')
-    ref_paths.append(f'_accuracy/emg/hdc/all')
+        return acc_all
 
-    losses_pqhdc = []
-    for acc_path, ref_path in zip(acc_paths, ref_paths):
-        loss = _parse_app(acc_path, ref_path)
-        losses_pqhdc.append(loss)
+    def _parse_technique(technique_name: str, acc_ref: NDArray, emg_all: bool) -> NDArray:
+        # acc.shape = [app, bit/retraining, dim, seed]
+        acc = _parse_transformation(technique_name, emg_all=emg_all)
+
+        # Swap axes to compute losses #
+        # Make acc.shape compatible with acc_ref shape, which is [app, dim, seed]
+        # acc.shape = [bit/retraining, app, dim, seed]
+        acc = np.swapaxes(acc, 0, 1)
+        losses = acc_ref - acc
+        # Bring apps to the first dimension as:
+        # losses.shape = [app, bit/retraining, dim, seed]
+        losses = np.swapaxes(losses, 0, 1)
+
+        # Collapse last dimension of losses by computing the mean of all seeds
+        losses = np.mean(losses, axis=-1)
+
+        # Collapse the last dimension
+        return losses
+
+    losses_tqhd = _parse_technique('paper-fault/tqhd', acc_ref, emg_all=True)
+    losses_pqhdc = _parse_technique('paper-fault/pqhdc', acc_ref, emg_all=True)
 
     start = 1
     end = 10
     step = 1
     noise_percents = np.arange(start, end+step, step)
     labels = ['$B2$', '$B3$', '$B4$']
-    apps += ['emg']
+    apps = APP_PLOT_NAMES
 
     # Filter bits
     for i in range(len([*zip(losses_tqhd, losses_pqhdc)])):
@@ -1644,9 +1673,9 @@ def figure_noise():
 def main():
     #figure_normal_distribution()
     #figure_error_deviation()
-    #figure_compaction()
+    figure_compaction()
     #figure_tqhd_vs_all()
-    figure_noise()
+    #figure_noise()
 
     # Suplementary deviation experiment
     # This loops extends the design space exploration to also sweep dimensions
