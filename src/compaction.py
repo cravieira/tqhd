@@ -283,6 +283,9 @@ def main():
 
     args = parser.parse_args()
 
+    interleaving = not args.no_interleave
+    encoding_name = args.am_tqhd_encode_table.name
+
     c0_bits = args.compaction_bits0
     c1_bits = args.compaction_bits1
 
@@ -294,7 +297,7 @@ def main():
     bits = get_am_bits(model)
     am_classes = get_am_classes(model)
     subject_am = am
-    if not args.no_interleave:
+    if interleaving:
         subject_am = flip_blocks(am, bits)
     comp_am_size = compact_am(subject_am, args.compaction_bits0, args.compaction_bits1, min_val=0)
 
@@ -305,6 +308,8 @@ def main():
     tqhd_am_size = am_classes*bits*map_dim
     #comp_am_size = c_elem * c_bits
     header = [
+            'encoding',
+            'interleaving',
             'am_classes', # Number of classes for this application
             'map_dim', # Number of dimensions in the unquantized AM
             'tqhd_b', # Number of bits used TQHD quantization
@@ -329,6 +334,8 @@ def main():
             *stats_headers
             ]
     data = [
+            encoding_name,
+            interleaving,
             am_classes,
             map_dim,
             bits,
