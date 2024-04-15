@@ -14,7 +14,7 @@ source common.sh
 RESULT_DIR=_transformation # Result dir to be created
 POOL_DIR=_pool # Result dir to be created
 MAX_SEED=20 # Max number of seeds evaluated
-JOBS=14 # Number of parallel jobs to be executed
+JOBS=17 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 
 start=1000
@@ -168,6 +168,15 @@ function language() {
     echo "\n"
 }
 
+function hdchog() {
+    local app="hdchog-fashionmnist"
+    local acc_dir="$RESULT_DIR/$app/hdc/compaction"
+    local pool_dir="$POOL_DIR/$app/hdc"
+    local dataset="FashionMNIST"
+    launch_patched "src/hdchog.py --dataset $dataset" "$acc_dir" "$pool_dir" exp_table[@]
+    echo "\n"
+}
+
 # Launch GraphHD experiment for a given dataset.
 # $1: Name of the dataset. Must be one of the dataset options avaible in
 #   graphhd.py
@@ -190,6 +199,7 @@ cmd+=$(voicehd)
 cmd+=$(emg)
 cmd+=$(mnist)
 cmd+=$(language)
+cmd+=$(hdchog)
 cmd+=$(com_graphhd)
 
 #printf "$cmd"
