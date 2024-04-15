@@ -512,7 +512,8 @@ def save_model(model, path: str | Path):
     torch.save(model, path)
 
 def load_model(path: str | Path):
-    model = torch.load(path)
+    device = torch.device(_current_pytorch_device)
+    model = torch.load(path, map_location=device)
     if model is None:
         raise RuntimeError(f'Failed to load model at {str(path)}')
     return model
