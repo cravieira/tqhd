@@ -178,25 +178,27 @@ def binary_rle(
             current_size = symbol_1_size
             max_val = max_1_val
 
+        return current_symbol, current_size, max_val
+
     for elem in vector:
         length = elem.item()
         if elem <= max_val:
             compacted.append(length)
 
-            _swap_symbol()
+            current_symbol, current_size, max_val = _swap_symbol()
         else:
             left = length
             while left > 0:
                 bits_compacted = min(left, max_val)
                 compacted.append(bits_compacted)
-                _swap_symbol()
+                current_symbol, current_size, max_val = _swap_symbol()
 
                 left -= bits_compacted
                 # Check if the last part of the length was compressed
                 if left <= 0:
                     break
                 compacted.append(min_val)
-                _swap_symbol()
+                current_symbol, current_size, max_val = _swap_symbol()
 
     return compacted
 
