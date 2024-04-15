@@ -33,6 +33,15 @@ def get_statiscs(am: torch.Tensor):
     # Transform Pytorch tensors to numpy arrays
     counts = [c.numpy(force=True) for c in counts ]
 
+    # Compute the mean number of groups in an AM. This is usefuld to evaluate
+    # the fragmentation of a encoding/interleaving combination. Consider the
+    # following binary vector:
+    # 0001001110110
+    # Its "counts" of contiguous groups is [3, 1, 2, 3, 1, 2, 1], and its
+    # number of groups is 7.
+    number_of_groups = np.array(list(map(len, counts)))
+    mean_groups = np.mean(number_of_groups)
+
     # Split the group lengths between 0s and 1s. This is useful to evaluate
     # better compression on encoding strategies that have a different number of
     # 0s and 1s such as BandMatrix.
@@ -85,7 +94,7 @@ def get_statiscs(am: torch.Tensor):
     headers_0 = [h+'_0' for h in headers]
     headers_1 = [h+'_1' for h in headers]
 
-    return [*stats_0, *stats_1], [*headers_0, *headers_1]
+    return [mean_groups, *stats_0, *stats_1], ['mean_groups', *headers_0, *headers_1]
 
 def print_statistics(t: torch.Tensor):
     print('mean:', torch.mean(t, dtype=torch.float))
