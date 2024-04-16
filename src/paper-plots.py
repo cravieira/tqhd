@@ -892,7 +892,30 @@ def figure_compaction():
             ['BaseZero-interleave', '6', '4', '4'],
             ['BaseZero-interleave', '7', '4', '4'],
             ['BaseZero-interleave', '8', '4', '4'],
+            ['BandMatrix-no-interleave', '2', '2', '1'],
+            ['BandMatrix-no-interleave', '3', '3', '1'],
+            ['BandMatrix-no-interleave', '3', '3', '2'],
+            ['BandMatrix-no-interleave', '4', '3', '2'],
+            ['BandMatrix-no-interleave', '4', '3', '3'],
+            ['BandMatrix-no-interleave', '4', '4', '4'],
+            ['BandMatrix-no-interleave', '5', '3', '3'],
+            #['BandMatrix-no-interleave', '5', '4', '2'],
+            #['BandMatrix-no-interleave', '5', '4', '3'],
+            #['BandMatrix-no-interleave', '5', '4', '4'],
+            #['BandMatrix-no-interleave', '6', '4', '2'],
+            #['BandMatrix-no-interleave', '6', '4', '3'],
+            #['BandMatrix-no-interleave', '6', '4', '4'],
+            #['BandMatrix-no-interleave', '7', '4', '2'],
+            #['BandMatrix-no-interleave', '7', '4', '3'],
+            #['BandMatrix-no-interleave', '7', '4', '4'],
+            #['BandMatrix-no-interleave', '8', '4', '2'],
+            #['BandMatrix-no-interleave', '8', '4', '3'],
+            #['BandMatrix-no-interleave', '8', '4', '4'],
         ]
+    config_headers = [(enc, make_latex_equation(f'B{bits}C_0{c0}C_1{c1}')) for enc, bits, c0, c1 in configs]
+    config_headers_indexes = pd.MultiIndex.from_tuples(config_headers)
+    print(config_headers_indexes)
+    #config_headers = [f'{enc}T{bits}C_0{c0}C_1{c1}' for enc, bits, c0, c1 in configs]
 
     def _parse_compaction_app(app_name: str):
         path = f'_transformation/{app_name}/hdc/compaction'
@@ -906,41 +929,56 @@ def figure_compaction():
 
     app_names = ['voicehd', 'mnist', 'language', 'hdchog', 'emg', 'graphhd']
 
-    apps = ['voicehd', 'mnist', 'language', 'hdchog-fashionmnist']
-    compaction_rates = list(map(_parse_compaction_app, apps))
-    compaction_rates = np.array(compaction_rates)
+    df_file = Path('parsed-compression.pt')
+    if df_file.is_file():
+    #if False:
+        table_df = pd.read_pickle(df_file)
+    else:
+        apps = ['voicehd', 'mnist', 'language', 'hdchog-fashionmnist']
+        compaction_rates = list(map(_parse_compaction_app, apps))
+        compaction_rates = np.array(compaction_rates)
 
-    emg_apps = ['emg-s0', 'emg-s1', 'emg-s2', 'emg-s3', 'emg-s4']
-    emg_rates = _parse_multidataset_app(emg_apps)
-    compaction_rates = np.vstack((compaction_rates, emg_rates))
+        emg_apps = ['emg-s0', 'emg-s1', 'emg-s2', 'emg-s3', 'emg-s4']
+        emg_rates = _parse_multidataset_app(emg_apps)
+        compaction_rates = np.vstack((compaction_rates, emg_rates))
 
-    global GRAPHHD_DATASETS
-    graphhd_apps = GRAPHHD_DATASETS
-    graphhd_rates = _parse_multidataset_app(graphhd_apps)
-    compaction_rates = np.vstack((compaction_rates, graphhd_rates))
+        global GRAPHHD_DATASETS
+        graphhd_apps = GRAPHHD_DATASETS
+        graphhd_rates = _parse_multidataset_app(graphhd_apps)
+        compaction_rates = np.vstack((compaction_rates, graphhd_rates))
 
-    compaction_rates *= 100 # Make percentage
-    # Add mean column at the end of array
-    means = np.mean(compaction_rates, axis=0).reshape(1, -1)
-    table = np.transpose(np.vstack((compaction_rates, means)))
+        compaction_rates *= 100 # Make percentage
+        # Add mean column at the end of array
+        means = np.mean(compaction_rates, axis=0).reshape(1, -1)
+        #__import__('pudb').set_trace()
+        table = np.vstack((compaction_rates, means))
 
-    headers = [*app_names, 'mean']
-    config_labels = [f'{execution_type}-$B{tqhd_bits}C_0{c0_size}C_1{c1_size}$' for execution_type, tqhd_bits, c0_size, c1_size in configs]
-    configs_df = pd.DataFrame({'config': config_labels})
+        headers = [*app_names, 'mean']
+        table_df = pd.DataFrame(data=table, index=headers, columns=config_headers_indexes)
+        print(table_df)
+        table_df.to_pickle(df_file)
 
-    table_df = pd.DataFrame(data=table, columns=headers)
+    #config_labels = [f'{execution_type}-$B{tqhd_bits}C_0{c0_size}C_1{c1_size}$' for execution_type, tqhd_bits, c0_size, c1_size in configs]
 
-    table_df = pd.concat([configs_df, table_df], axis=1)
-
-    latex_alignment = 'c' * table_df.columns.size
+    latex_alignment = 'c' * (table_df.columns.size+1)
     float_format = lambda s: '{:.1f}\%'.format(s)
-    latex = table_df.to_latex(
-            index=False, # No row number
-            float_format=float_format,
-            column_format=latex_alignment,
+    styler = table_df.style
+    # Rotate column names 90 degrees
+    styler.applymap_index(
+            lambda _: "rotatebox:{-90}--rwrap;",
+            axis='columns',
+            level=1
+            )
+
+    # Format inner data:
+    styler.format(float_format)
+
+    latex = styler.to_latex(
+            hrules=True,
             caption='Memory footprint reduction in compacted AM.',
             label='tab:compaction'
             )
+    print('--- Latex ---')
     print(latex)
     with open('_plots/compaction.tex', 'w') as f:
         print(latex, file=f)
