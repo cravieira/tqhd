@@ -227,13 +227,20 @@ class AMBsc(BaseAM):
 # Quantization AMs #
 # These AMs are experimental models that perform quantization. The goal is to
 # take a query vector from the MAP model and map it to a binary model.
-def normalize(t, dtype=torch.get_default_dtype()):
+def _magnitude(t, dtype=torch.get_default_dtype()):
     # Normalize input
     dot = torch.sum(t*t, dim=-1, dtype=dtype)
     mag = torch.sqrt(dot)
     # Adjust shape
     mag = mag.unsqueeze(1)
-    #norm = t/mag
+    return mag
+
+constant_mag = None
+def normalize(t, dtype=torch.get_default_dtype()):
+    global constant_mag
+
+    mag = _magnitude(t, dtype=dtype)
+
     norm = torch.div(t, mag)
 
     return norm
@@ -294,6 +301,7 @@ class AMThermometer(AMMap):
             dtype=torch.get_default_dtype(),
             device=None,
             enc_table_type: TableType=TableType.BaseZero,
+            cache_norm=False,
             **kwargs):
         self.possible_encodings = bits + 1
         if intervals > self.possible_encodings:
@@ -309,6 +317,9 @@ class AMThermometer(AMMap):
         self.register_buffer('poles', None)
         self.enc_table = self._encode_table(bits, intervals, enc_table_type)
         self.poles = None
+
+        self._norm_opt = cache_norm
+        self._cached_mag = None
 
     def _encode_table(self, bits, entries, table_type):
         """
@@ -365,11 +376,21 @@ class AMThermometer(AMMap):
         # Alternative approach generating the quantizaiton poles to each input
         #return self._create_poles(input, self.quantile)
 
-    def transform(self, input):
+    def transform(self, input, inference: bool):
         t = torchhd.functional.ensure_vsa_tensor(input, vsa='MAP', dtype=torch.float)
         dtype = torch.float
 
-        norm = normalize(t, dtype=dtype)
+        # Normalization optimization should occur only at inference time
+        if self._norm_opt and inference:
+            # Cache the magnitude of any vector transformed at inference time
+            if self._cached_mag is None:
+                norm = normalize(t, dtype=dtype)
+                self._cached_mag = _magnitude(t, dtype=dtype)
+                print('Cache norm activated')
+            else:
+                norm = torch.div(t, self._cached_mag)
+        else:
+            norm = normalize(t, dtype=dtype)
 
         poles = self._get_poles(norm)
         inds = _find_poles(norm, poles)
@@ -380,10 +401,10 @@ class AMThermometer(AMMap):
 
     def train_am(self):
         super().train_am()
-        self.am = self.transform(self.am)
+        self.am = self.transform(self.am, inference=False)
 
     def search(self, query):
-        vector = self.transform(query)
+        vector = self.transform(query, inference=True)
         am = self.prediction_am()
         logit = torchhd.hamming_similarity(vector, am)
         return logit

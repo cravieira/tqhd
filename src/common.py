@@ -288,6 +288,15 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Choose the thermometer encode table used. Defaults to "{default_encode_table}".'
             )
 
+    group.add_argument(
+            '--am-tqhd-cache-norm',
+            action='store_true',
+            help=f'Enable cache normalization optimization. The optimization '
+            'consists of caching the magnitude of a HV at inference time and '
+            'divide new query vectors by the cached magnitude instead of '
+            'computing the norm.'
+            )
+
     learning_types = ['Centroid', 'CentroidOnline']
     default_learning = 'Centroid'
     group.add_argument(
@@ -406,7 +415,18 @@ def pick_am_model(
         intervals = kwargs['am_intervals']
         deviation = kwargs['am_tqhd_deviation']
         enc_table = kwargs['am_tqhd_encode_table']
-        am = AMThermometerDeviation(dim, num_classes, bits, intervals, deviation, enc_table_type=enc_table, learning=learning, prediction=prediction, **kwargs)
+        cache_norm = kwargs['am_tqhd_cache_norm']
+        am = AMThermometerDeviation(
+                dim,
+                num_classes,
+                bits,
+                intervals,
+                deviation,
+                enc_table_type=enc_table,
+                learning=learning,
+                prediction=prediction,
+                cache_norm=cache_norm,
+                **kwargs)
     elif am_type == 'SQ':
         am = AMSignQuantize(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
     elif am_type == 'PQHDC':
