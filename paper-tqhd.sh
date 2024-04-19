@@ -156,11 +156,11 @@ function graphhd_dataset() {
 
 enable_venv
 cmd=""
-#cmd+=$(voicehd)
-#cmd+=$(emg)
-#cmd+=$(mnist)
-#cmd+=$(language)
-#cmd+=$(hdchog)
+cmd+=$(voicehd)
+cmd+=$(emg)
+cmd+=$(mnist)
+cmd+=$(language)
+cmd+=$(hdchog)
 cmd+=$(com_graphhd)
 
 #printf "$cmd"
