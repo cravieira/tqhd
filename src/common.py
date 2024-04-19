@@ -441,10 +441,10 @@ def set_random_seed(seed=0):
     # These seed setings were did not change the accuracy, but the pytorch
     # documentation recommends setting them:
     # https://pytorch.org/docs/stable/notes/randomness.html
-    #import random
-    #random.seed(0)
-    #import numpy as np
-    #np.random.seed(0)
+    import random
+    random.seed(seed)
+    import numpy as np
+    np.random.seed(seed)
     # The following seed setting changed the results.
     torch.manual_seed(seed)
     torch.set_num_threads(1)
