@@ -21,6 +21,9 @@ POOL_DIR=_pool # Pool dir to be created
 MAX_SEED=20 # Max number of seeds evaluated
 JOBS=12 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
+# Name of the experiment executed by this script. Can be overriden by child
+# scripts for custom behavior
+EXP_NAME='deviation'
 
 # DIMENSIONS: Space separated list of dimensions values to be experimented.
 # Scripts that include this script can override this variable.
@@ -28,6 +31,10 @@ start=1000
 step=1000
 final=1000
 DIMENSIONS=$(seq $start $step $final)
+
+# Flag to dispatch experiments using vector normalization optimization. Child
+# scripts must set this variable to activate the cache behavior.
+TQHD_CACHE_NORM=''
 
 # Experiment tables
 # <Bits> <Dimension>
@@ -99,7 +106,12 @@ function launch_hdc_table() {
                         load_cmd=$(create_load_cmd $pool_dir $dim $seed)
                     fi
 
-                    echo py_launch "$cmd $load_cmd $exp $vsa $am_type --am-tqhd-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
+                    local tqhd_cache_cmd=''
+                    if [ $TQHD_CACHE_NORM ]; then
+                        tqhd_cache_cmd='--am-tqhd-cache-norm'
+                    fi
+
+                    echo py_launch "$cmd $tqhd_cache_cmd $load_cmd $exp $vsa $am_type --am-tqhd-deviation $dev --device $DEVICE --seed $seed --accuracy-file $acc_file"
                 done
             done
         done
@@ -109,7 +121,7 @@ function launch_hdc_table() {
 
 function voicehd() {
     local app="voicehd"
-    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     local pool_dir="$POOL_DIR/$app/hdc"
     launch_hdc_table "src/voicehd_hdc.py" "$acc_dir" exp_table[@]  "$pool_dir"
     echo "\n"
@@ -117,14 +129,14 @@ function voicehd() {
 
 function emg() {
     local app="emg"
-    local acc_dir="$RESULT_DIR/$app/hdc/all/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/all/$EXP_NAME"
     launch_hdc_table "src/emg.py" "$acc_dir" exp_table[@]
     echo "\n"
 }
 
 function mnist() {
     local app="mnist"
-    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     local pool_dir="$POOL_DIR/$app/hdc"
     launch_hdc_table "src/mnist_hdc.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
@@ -132,7 +144,7 @@ function mnist() {
 
 function language() {
     local app="language"
-    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     local pool_dir="$POOL_DIR/$app/hdc"
     launch_hdc_table "src/language.py " "$acc_dir" exp_table[@] "$pool_dir"
     echo "\n"
@@ -140,7 +152,7 @@ function language() {
 
 function hdchog() {
     local app="hdchog-fashionmnist"
-    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     local pool_dir="$POOL_DIR/$app/hdc"
     local dataset="FashionMNIST"
 
@@ -156,7 +168,7 @@ function graphhd_dataset() {
     local dataset="$1"
     local lower_case_ds=$(com_to_lowercase "$dataset")
     local app="graphhd-$lower_case_ds"
-    local acc_dir="$RESULT_DIR/$app/hdc/deviation"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     local pool_dir="$POOL_DIR/$app/hdc"
 
     launch_hdc_table "src/graphhd.py --dataset $dataset" "$acc_dir" exp_table[@] "$pool_dir"
