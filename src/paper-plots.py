@@ -1471,7 +1471,8 @@ def figure_tqhd_vs_all():
     # better than the reference models since the reference models do not have
     # retraining.
     # Retrieve 3rd, 6th, and 9th retraining epoch.
-    losses_quanthdbin = losses_quanthdbin[:,2:5:1]
+    QUANTHD_EPOCHS = np.array([3, 7, 10])
+    losses_quanthdbin = losses_quanthdbin[:,QUANTHD_EPOCHS]
 
     # Create the labels below the xticks
     dimensions_str = ['D'+str(dim) for dim in np.arange(1000, 11000, 1000)]
@@ -1556,7 +1557,8 @@ def figure_tqhd_vs_all():
     legend_labels = []
     data = [tqhd, quanthdbin]
     tqhd_labels = ['$B2$', '$B3$', '$B4$']
-    quanthdbin_labels = ['$R2$', '$R3$', '$R4$']
+    QUANTHD_EPOCHS = np.array([3, 7, 10])
+    quanthdbin_labels = [f'R{epoch}' for epoch in QUANTHD_EPOCHS]
 
     # Add a legend entry for each technique
     for d in data:
@@ -1587,7 +1589,7 @@ def figure_tqhd_vs_all():
             'ncols': len(legend_labels)
         }
     # Make TQHD vs QuantHD
-    #plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_quanthd.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
+    plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_quanthd.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
 
     # TODO: This will need adjustments for the paper discussion
     def _scalability(data_tqhd, data_pqhdc, data_quanthd):
@@ -1620,9 +1622,9 @@ def figure_tqhd_vs_all():
         print_labeled(improvement_pqhdc, APP_PLOT_NAMES)
         print('QuantHD D=1000:')
         print_labeled(dim_quanthd, APP_PLOT_NAMES)
-        print('Improvement QuantHD when increasing B for D=1000 (<0 values mean accuracy loss reduction):')
+        print('Improvement QuantHD when increasing T for D=1000 (<0 values mean accuracy loss reduction):')
         print_labeled(improvement_quanthd, APP_PLOT_NAMES)
-        print('TQHD (B2) - QuantHD (Rmax) for D=1K. <0 results indicate that TQHD is better.')
+        print('Loss TQHD (B2) - Loss QuantHD (Rmax) for D=1K. <0 results indicate that TQHD is better.')
         print_labeled(dim_tqhd[:,0]-dim_quanthd[:,-1], APP_PLOT_NAMES)
     _scalability(losses_tqhd, losses_pqhdc, losses_quanthdbin)
 
@@ -1719,8 +1721,8 @@ def figure_noise():
 def main():
     #figure_normal_distribution()
     #figure_error_deviation()
-    figure_compaction()
-    #figure_tqhd_vs_all()
+    #figure_compaction()
+    figure_tqhd_vs_all()
     #figure_noise()
 
     # Suplementary deviation experiment
