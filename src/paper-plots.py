@@ -1075,7 +1075,7 @@ def plot_tqhd_vs_pqhdc(
         #        linestyle='--',
         #    )
 
-        ax.autoscale(enable=True, axis='x', tight=True)
+        #ax.autoscale(enable=True, axis='x', tight=True)
         ## Check if any plotted data is below 0
         #if min_y > 0:
         #    ax.set_ylim(ymin=np.floor(min_y))
