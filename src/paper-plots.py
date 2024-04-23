@@ -63,8 +63,17 @@ APP_NAME_STYLE = dict(
             fontstyle='oblique',
         )
 
+# Dimension values and ticks used in the plots. These variable are plot specific
 def make_latex_equation(t: str) -> str:
     return '$'+t+'$'
+
+_dim_start = 1000
+_dim_end = 10000
+_dim_step = 1000
+PLOT_DIMS = np.arange(_dim_start, _dim_end+_dim_step, _dim_step)
+#PLOT_DIM_TICKS_POS = [1000, 2000, 3000, 4000, 6000, 8000, 10000]
+PLOT_DIM_TICKS_POS = [int(d) for d in PLOT_DIMS]
+PLOT_DIM_TICKS_LABELS = [make_latex_equation(str(int(d/1000)))+'K' for d in PLOT_DIM_TICKS_POS]
 
 def str_replace(t: str, pattern: str, to: str) -> str:
     return t.replace(pattern, to)
@@ -1217,6 +1226,8 @@ def plot_accuracy(
         colors=None,
         xlabel='Dimensions',
         legend_dict=None,
+        xticks_pos=None,
+        xticks_labels=None,
         **kwargs):
     """docstring for plot_tqhd_vs_pqhdc"""
     cm = 1/2.54  # centimeters in inches
@@ -1283,6 +1294,11 @@ def plot_accuracy(
             verticalalignment="bottom",
             **APP_NAME_STYLE,
         )
+
+    # Set custom xticks labels and set custom position
+    if xticks_pos and xticks_labels:
+        for ax in axs.flatten():
+            ax.set_xticks(xticks_pos, labels=xticks_labels)
 
     #    ax.autoscale(enable=True, axis='x', tight=True)
         ## Check if any plotted data is below 0
@@ -1447,16 +1463,8 @@ def figure_tqhd_vs_all():
     losses_pqhdc = _parse_transformation_technique('pqhdc', acc_ref, emg_all=True)
     losses_quanthdbin = _parse_transformation_technique('quanthdbin', acc_ref, emg_all=False)
 
-    # Optional: Remove results for B3, and B4 for TQHD and PQHDC since they B2
-    # can already quantize EMG pretty well.
-    #losses_tqhd[-1] = np.expand_dims(losses_tqhd[-1][0], axis=0)
-    #losses_pqhdc[-1] = np.expand_dims(losses_pqhdc[-1][0], axis=0)
-
-    #losses_pqhdc = np.array(losses_pqhdc)
-    dim_start = 1000
-    dim_end = 10000
-    dim_step = 1000
-    dims = np.arange(dim_start, dim_end+dim_step, dim_step)
+    global PLOT_DIMS
+    dims = PLOT_DIMS
 
     # Filter bits #
     # This plot shows only bits 2 to 4 and not the entire experiment space.
@@ -1550,7 +1558,17 @@ def figure_tqhd_vs_all():
             }
 
     # Make TQHD vs PQHDC
-    plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_pqhdc.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
+    plot_accuracy(
+            dims,
+            data,
+            APP_PLOT_NAMES,
+            path='_plots/tqhd_vs_pqhdc.pdf',
+            colors=colors,
+            legend_dict=legend_dict,
+            xlabel='Dimensions ($D$)',
+            xticks_pos=PLOT_DIM_TICKS_POS,
+            xticks_labels=PLOT_DIM_TICKS_LABELS,
+            )
 
     # TQHD vs QuantHD #
     patches = []
@@ -1589,7 +1607,17 @@ def figure_tqhd_vs_all():
             'ncols': len(legend_labels)
         }
     # Make TQHD vs QuantHD
-    plot_accuracy(dims, data, APP_PLOT_NAMES, path='_plots/tqhd_vs_quanthd.pdf', colors=colors, legend_dict=legend_dict, xlabel='Dimensions')
+    plot_accuracy(
+            dims,
+            data,
+            APP_PLOT_NAMES,
+            path='_plots/tqhd_vs_quanthd.pdf',
+            colors=colors,
+            legend_dict=legend_dict,
+            xlabel='Dimensions ($D$)',
+            xticks_pos=PLOT_DIM_TICKS_POS,
+            xticks_labels=PLOT_DIM_TICKS_LABELS,
+            )
 
     # TODO: This will need adjustments for the paper discussion
     def _scalability(data_tqhd, data_pqhdc, data_quanthd):
