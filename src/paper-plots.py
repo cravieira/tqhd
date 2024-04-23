@@ -17,6 +17,7 @@ import numpy as np
 import natsort
 from pathlib import Path
 import re
+from string import ascii_lowercase
 import pandas as pd
 from typing import List
 
@@ -229,7 +230,7 @@ def figure_histogram(data, sty, legends=None, **kwargs):
     # https://matplotlib.org/stable/gallery/statistics/histogram_features.html
 
     # Make a grid of 4 axis
-    fig, axs = plt.subplots(nrows=2, ncols=2, sharex=False)
+    fig, axs = plt.subplots(nrows=2, ncols=2, sharex=False, layout='constrained')
 
     num_bins = 42
 
@@ -317,16 +318,14 @@ def figure_histogram(data, sty, legends=None, **kwargs):
         ax.set_ylim(ymax=0.6)
 
     ax.plot([], [], '--', color='black', label='PDF')
-    # Hack to make the legend box not appear in front of the toppest plots. I
-    # think matplotlib tight_layout is not working propperly.
-    axs.flatten()[0].set_title(' ')
-    fig.legend(loc='outside upper center', ncols=len(data)+1, fontsize='x-small')
+    for ax, letter in zip(axs.flatten(), ascii_lowercase):
+        ax.set_xlabel(f'({letter})')
+    fig.legend(loc='outside upper center', ncols=len(data)+1, fontsize='small')
 
     fig.supxlabel(r'Value ($\sigma$)')
     fig.supylabel('Probability Density')
     ax.set_axisbelow(True)
     ax.grid(visible=True)
-    plt.tight_layout()
 
     #plt.show()
     plot._plot(**kwargs)
@@ -345,6 +344,7 @@ def figure_normal_distribution():
     am_type = 'V'
     models = []
     dims = [1000, 10000]
+
     for dim in dims:
         model = voicehd.VoiceHD_HDC(
                 dim,
@@ -1747,10 +1747,10 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    #figure_normal_distribution()
+    figure_normal_distribution()
     #figure_error_deviation()
     #figure_compaction()
-    figure_tqhd_vs_all()
+    #figure_tqhd_vs_all()
     #figure_noise()
 
     # Suplementary deviation experiment
