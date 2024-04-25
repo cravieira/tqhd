@@ -454,16 +454,8 @@ def extract_substring(regular_exp, string: str) -> str:
 def plot_deviation(data, dev_range, apps, labels, hline=None, **kwargs):
     """docstring for plot_deviation"""
     ax_size = len(data)
-    #if ax_size != 4:
-    #    raise RuntimeError('Argument "data" must have 4 entries, one for each application')
     cm = 1/2.54  # centimeters in inches
     IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
-    #fig, axs = plt.subplots(
-    #        nrows=ax_size,
-    #        ncols=2,
-    #        #sharex=True,
-    #        figsize=(IEEE_column_width*2, IEEE_column_width*3)
-    #        )
     fig, axs = plt.subplots(
             nrows=math.ceil(ax_size/2),
             ncols=2,
@@ -1264,26 +1256,6 @@ def plot_accuracy(
     for d in data:
         _plot_technique(d, axs)
 
-    #for app_tqhd, app_pqhdc, ax, app_name in zip(data_tqhd, data_pqhdc, axs.flatten(), apps):
-    #    min_y = float('inf')
-    #    #for curve, label in zip(app_data, labels):
-    #    quanthd_marker = '^'
-    #    quanthd_linestyle = '-'
-    #    markers = cycler(
-    #            marker=[tqhd_marker, pqhdc_marker, quanthd_marker],
-    #            linestyle=[tqhd_linestyle, pqhdc_linestyle, quanthd_linestyle]
-    #            )
-    #    for curve_tqhd, curve_pqhdc, label, color in zip(app_tqhd, app_pqhdc, labels, colors):
-
-    #        ## This step is used to align the y axis to 0. This prevents
-    #        ## matplotlib to create y axis with different starting points.
-    #        #min = np.min(mean)
-    #        #min_y = min if min < min_y else min
-    #        ## TODO: This is a workaround to make the legend a little bit above
-    #        ## the plots since matplotlib tight_layout is not working correctly
-    #        ## for this plot.
-    #        ax.set_title(' ')
-
     # Place application name at the right of each plot
     for ax, app_name in zip(axs.flatten(), apps):
         ax.yaxis.set_label_position('right')
@@ -1300,11 +1272,6 @@ def plot_accuracy(
         for ax in axs.flatten():
             ax.set_xticks(xticks_pos, labels=xticks_labels)
 
-    #    ax.autoscale(enable=True, axis='x', tight=True)
-        ## Check if any plotted data is below 0
-        #if min_y > 0:
-        #    ax.set_ylim(ymin=np.floor(min_y))
-
     # TODO: This is a workaround to make the legend a little bit above
     # the plots since matplotlib tight_layout is not working correctly
     # for this plot.
@@ -1315,97 +1282,6 @@ def plot_accuracy(
 
     fig.supylabel('Accuracy Loss in pp')
     fig.supxlabel(xlabel)
-
-    plt.tight_layout()
-    plot._plot(**kwargs)
-
-def plot_tqhd_vs_all_bar(
-        data_tqhd,
-        data_pqhdc,
-        data_quanthd,
-        dims,
-        apps,
-        labels,
-        colors=None,
-        tqhd_hatch='o',
-        pqhdc_hatch='X',
-        quanthd_hatch='*',
-        xlabel='Dimensions',
-        xaxis_tick_formatter=None,
-        xticks_labels="",
-        **kwargs):
-    """docstring for plot_tqhd_vs_pqhdc"""
-    ax_size = len(data_tqhd)
-    cm = 1/2.54  # centimeters in inches
-    IEEE_column_width = 8.89*cm # Column width in IEEE paper in cms
-    fig, axs = plt.subplots(
-            nrows=5,
-            ncols=1,
-            #sharex=True,
-            figsize=(IEEE_column_width*4, IEEE_column_width*2)
-            )
-
-    #data_tqhd = np.mean(data_tqhd, axis=-1)
-    #data_pqhdc = np.mean(data_pqhdc, axis=-1)
-    #data_quanthd = np.mean(data_quanthd, axis=-1)
-    if colors is None:
-        prop_cycle = plt.rcParams['axes.prop_cycle']
-        colors = prop_cycle.by_key()['color']
-
-    hatches = [pqhdc_hatch, quanthd_hatch, tqhd_hatch]
-
-    num_dims = data_tqhd.shape[-2]
-    x = np.arange(num_dims)
-    width = 0.09
-    multiplier = 0
-    for app_tqhd, app_pqhdc, app_quanthd, ax, app_name in zip(data_tqhd, data_pqhdc, data_quanthd, axs.flatten(), apps):
-        multiplier = 0
-        for technique, hatch in zip([app_pqhdc, app_quanthd, app_tqhd], hatches):
-            # Get the mean of all seeds
-            mean = np.mean(technique, axis=-1)
-            for scenario, color in zip(mean, colors):
-                offset = width*multiplier
-                rects = ax.bar(x+offset, scenario, width, hatch=hatch, edgecolor='black', color=color)
-                multiplier += 1
-            # Adjust xticks to the middle of each bar group
-            ax.set_xticks(x + (width*(multiplier-1)/2), xticks_labels, fontstyle='italic')
-
-        # Place application name at the right of the plot
-        ax.yaxis.set_label_position('right')
-        ax.set_ylabel(
-            app_name,
-            rotation=270,
-            rotation_mode='anchor',
-            verticalalignment="bottom",
-            **APP_NAME_STYLE,
-        )
-
-    # Create legend handles
-    data = data_tqhd[0]
-    patches = []
-    for _, color in zip(data, colors):
-        patch = mpatches.Patch(facecolor=color, label='The red data', edgecolor='black')
-        patches.append(patch)
-
-    patch = mpatches.Patch(facecolor='white', hatch=pqhdc_hatch, edgecolor='black')
-    patches.append(patch)
-    patch = mpatches.Patch(facecolor='white', hatch=quanthd_hatch, edgecolor='black')
-    patches.append(patch)
-    patch = mpatches.Patch(facecolor='white', hatch=tqhd_hatch, edgecolor='black')
-    patches.append(patch)
-    legend_labels = labels+['PQ-HDC', 'QuantHD', 'TQHD']
-
-    #handles, labels = axs.flatten()[0].get_legend_handles_labels()
-    #fig.legend(patches, legend_labels, loc='outside upper center', ncols=len(data_tqhd[0])+2, fontsize='small')
-    fig.legend(patches, legend_labels, loc='outside upper center', ncols=9, fontsize='small')
-
-    # TODO: This is a workaround to make the legend a little bit above the
-    # plots since matplotlib tight_layout is not working correctly for this
-    # plot.
-    axs.flatten()[0].set_title(' ')
-
-    fig.supylabel('Accuracy Loss in pp')
-    #fig.supxlabel(xlabel)
 
     plt.tight_layout()
     plot._plot(**kwargs)
