@@ -1411,7 +1411,11 @@ def plot_tqhd_vs_all_bar(
     plot._plot(**kwargs)
 
 def figure_tqhd_vs_all():
-    """docstring for figure_tqhd_vs_pqhdc"""
+    """
+    This function produces the results that support the discussion in Section
+    5.3. It creates the plots TQHD vs PQ-HDC and TQHD vs QuantHD, and it prints
+    the accuracy values discussed in text.
+    """
     apps = [
             'voicehd',
             'mnist',
@@ -1440,14 +1444,25 @@ def figure_tqhd_vs_all():
 
         return acc_all
 
-    def _parse_transformation_technique(technique_name: str, acc_ref: NDArray, emg_all: bool) -> NDArray:
-        # acc.shape = [app, bit/retraining, dim, seed]
-        acc = _parse_transformation(technique_name, emg_all=emg_all)
+    def _compute_transformation_loss(acc_ref: NDArray, acc_transformation: NDArray) -> NDArray:
+        """
+        Compute the accuracy loss obtained by a transformation given a
+        reference accuracy. Negative values mean that the transformation was
+        able to achieve higher accuracies than the baseline.
 
+        :param acc_ref: A tensor with the baseline accuracies in the shape
+        [bit/retraining, app, dim, seed]
+        :param acc_transformation: A tensor with the accuracy achieved by a
+        transformation. This must be the tensor returned by
+        _parse_transformation(). The tensor shape must be [app, bit/retraining,
+        dim, seed]
+        :return: The accuracy loss of the transformation considering the
+        baseline
+        """
         # Swap axes to compute losses #
         # Make acc.shape compatible with acc_ref shape, which is [app, dim, seed]
         # acc.shape = [bit/retraining, app, dim, seed]
-        acc = np.swapaxes(acc, 0, 1)
+        acc = np.swapaxes(acc_transformation, 0, 1)
         losses = acc_ref - acc
         # Bring apps to the first dimension as:
         # losses.shape = [app, bit/retraining, dim, seed]
@@ -1455,8 +1470,14 @@ def figure_tqhd_vs_all():
 
         # Collapse last dimension of losses by computing the mean of all seeds
         losses = np.mean(losses, axis=-1)
+        return losses
 
-        # Collapse the last dimension
+    def _parse_transformation_technique(technique_name: str, acc_ref: NDArray, emg_all: bool) -> NDArray:
+        # acc.shape = [app, bit/retraining, dim, seed]
+        acc = _parse_transformation(technique_name, emg_all=emg_all)
+
+        losses = _compute_transformation_loss(acc_ref, acc)
+
         return losses
 
     losses_tqhd = _parse_transformation_technique('paper-tqhd', acc_ref, emg_all=True)
@@ -1549,7 +1570,6 @@ def figure_tqhd_vs_all():
 
     technique_names = [d['label'] for d in data]
     legend_labels = labels+technique_names
-    # TODO: Tornar a criação da legenda flexível. Isso vai permitir chamar o plot com variações diferentes de "data".
 
     legend_dict = {
             'handles': patches,
@@ -1557,7 +1577,7 @@ def figure_tqhd_vs_all():
             'ncols': len(legend_labels)
             }
 
-    # Make TQHD vs PQHDC
+    # Make TQHD vs PQHDC plot
     plot_accuracy(
             dims,
             data,
@@ -1606,7 +1626,7 @@ def figure_tqhd_vs_all():
             'labels': legend_labels,
             'ncols': len(legend_labels)
         }
-    # Make TQHD vs QuantHD
+    # Make TQHD vs QuantHD plot
     plot_accuracy(
             dims,
             data,
@@ -1619,12 +1639,11 @@ def figure_tqhd_vs_all():
             xticks_labels=PLOT_DIM_TICKS_LABELS,
             )
 
-    # TODO: This will need adjustments for the paper discussion
     def _scalability(data_tqhd, data_pqhdc, data_quanthd):
         '''
         In the paper, we want to show that TQHD provides better accuracy when
         given more resources and to showcase its potential in difficult
-        scenarios, i.e., low dimensions and voicehd/mnist.
+        scenarios, i.e., low dimensions.
         '''
         tqhd = data_tqhd
         pqhdc = data_pqhdc
@@ -1654,7 +1673,31 @@ def figure_tqhd_vs_all():
         print_labeled(improvement_quanthd, APP_PLOT_NAMES)
         print('Loss TQHD (B2) - Loss QuantHD (Rmax) for D=1K. <0 results indicate that TQHD is better.')
         print_labeled(dim_tqhd[:,0]-dim_quanthd[:,-1], APP_PLOT_NAMES)
+        print('')
     _scalability(losses_tqhd, losses_pqhdc, losses_quanthdbin)
+
+    # How many QuantHD epochs do we need to achieve the same accuracy as TQHD in VoiceHD, MNIST, and language?
+    def _quanthd_min_epochs(
+            transformation_name: str,
+            acc_ref: NDArray,
+            ) -> NDArray:
+        apps = ['voicehd', 'mnist', 'language']
+        acc_apps = parse_transformation_apps(apps, transformation_name)
+        # TODO: Get only the apps defined in "apps"
+        ref = acc_ref[0:3, ...]
+        # Get only baseline accuracies for D=1K
+        ref = np.expand_dims(ref[:,0,:], axis=1)
+
+        loss = _compute_transformation_loss(ref, acc_apps)
+        last_epoch_loss = loss[:, -1]
+
+        print('100th epoch loss:')
+        print_labeled(last_epoch_loss, apps)
+        return acc_apps
+
+    _quanthd_min_epochs(
+            'quanthdbin-min-epochs',
+            acc_ref)
 
 def figure_noise():
     """docstring for figure_noise"""
@@ -1747,10 +1790,10 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    figure_normal_distribution()
+    #figure_normal_distribution()
     #figure_error_deviation()
     #figure_compaction()
-    #figure_tqhd_vs_all()
+    figure_tqhd_vs_all()
     #figure_noise()
 
     # Suplementary deviation experiment
