@@ -1,6 +1,8 @@
 # Script for common variables and routines.
 
 # Common variables #
+MAX_SEED=20 # Max number of seeds evaluated
+
 # GraphHD datasets evaluated
 GRAPHHD_DATASETS=("DD" "ENZYMES" "MUTAG" "NCI1" "PROTEINS" "PTC_FM")
 

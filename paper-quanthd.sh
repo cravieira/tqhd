@@ -12,7 +12,6 @@ source common.sh
 
 RESULT_DIR=_transformation # Result dir to be created
 POOL_DIR=_pool # Model pool keep serialized trained models
-MAX_SEED=20 # Max number of seeds evaluated
 JOBS=18 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 

@@ -18,7 +18,6 @@ source common.sh
 
 RESULT_DIR=_transformation # Result dir to be created
 POOL_DIR=_pool # Pool dir to be created
-MAX_SEED=20 # Max number of seeds evaluated
 JOBS=12 # Number of parallel jobs to be executed
 DEVICE=cuda # Device used
 # Name of the experiment executed by this script. Can be overriden by child
