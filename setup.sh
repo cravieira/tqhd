@@ -13,6 +13,7 @@ else
     exit 1
 fi
 
+git submodule update --init --recursive
 # Create virtual environment and download packages
 python3 -m venv _venv
 source _venv/bin/activate
