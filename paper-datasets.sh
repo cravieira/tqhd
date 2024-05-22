@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Download datasets used in the paper.
+set -eu
 
 source common.sh
 
