@@ -5,7 +5,7 @@
 # experiment is to evaluate how the accuracy of the models change with
 # different initial values and dimensions
 
-set -e
+set -eu
 
 source common.sh
 
@@ -49,7 +49,10 @@ function launch_hdc_table() {
     local cmd=$1
     local acc_dir=$2
     declare -a table=("${!3}")
-    local pool_dir=$4
+    local pool_dir=""
+    if [[ $# -eq 4 ]]; then
+        pool_dir=$4
+    fi
 
     for (( seed = 0; seed < $MAX_SEED; seed++ )); do
         for (( i=0; i < ${#table[@]}; i++ )) ; do
