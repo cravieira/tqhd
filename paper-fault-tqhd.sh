@@ -93,7 +93,7 @@ function voicehd() {
 
 function emg() {
     local app="emg"
-    local acc_dir="$RESULT_DIR/$app/hdc/all/paper-fault/tqhd"
+    local acc_dir="$RESULT_DIR/$app-all/hdc/paper-fault/tqhd"
     launch "src/emg.py" "$acc_dir"
     echo "\n"
 }

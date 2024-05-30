@@ -45,7 +45,7 @@ function voicehd() {
 
 function emg() {
     local app="emg"
-    local acc_dir="$RESULT_DIR/$app/hdc/all/signquantize"
+    local acc_dir="$RESULT_DIR/$app-all/hdc/signquantize"
     launch "src/emg.py" "$acc_dir"
     echo "\n"
 }

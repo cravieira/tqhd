@@ -95,7 +95,7 @@ function emg() {
     # Run EMG on all subjects available in the dataset. The results of
     # "emg-all" contain the mean of all subjects.
     local acc_dir="$RESULTS_DIR/$app-all/hdc"
-    #launch_hdc_table "src/emg.py" "$acc_dir" exp_table[@]
+    launch_hdc_table "src/emg.py" "$acc_dir" exp_table[@]
 
     # Train a model for each subject, serialize it to disk, and save its
     # accuracy in a app-s<number> directory.

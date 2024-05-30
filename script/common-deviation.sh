@@ -127,8 +127,8 @@ function voicehd() {
 }
 
 function emg() {
-    local app="emg"
-    local acc_dir="$RESULT_DIR/$app/hdc/all/$EXP_NAME"
+    local app="emg-all"
+    local acc_dir="$RESULT_DIR/$app/hdc/$EXP_NAME"
     launch_hdc_table "src/emg.py" "$acc_dir" exp_table[@]
     echo "\n"
 }
