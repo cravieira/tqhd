@@ -192,8 +192,6 @@ def parse_app_reference_dir(path: str) -> NDArray:
     reference_models = natsort.humansorted(reference_models)
     reference_accs = list(map(parse_accuracy_directory, reference_models))
     reference_accs = [acc[0:20] for acc in reference_accs]
-    ## TODO: Quick fix to set all apps to he same number of seeds. REMOVE THIS LATER
-    #reference_accs = [acc[0:5] for acc in reference_accs]
     reference_accs = np.array(reference_accs)
 
     return reference_accs
@@ -567,7 +565,7 @@ def figure_error_deviation(dim=1000, suplementary=False):
         # Parse reference
         reference_acc = parse_accuracy_directory(reference_path)
         # Reshape reference_acc if it has been executed with more seeds
-        reference_acc = reference_acc[0:bit_accs[0].shape[1]]
+        #reference_acc = reference_acc[0:bit_accs[0].shape[1]]
 
         # The data to be plotted is the accuacy difference to the reference
         data = [np.subtract(reference_acc, acc) for acc in bit_accs]
@@ -612,23 +610,10 @@ def figure_error_deviation(dim=1000, suplementary=False):
         data, sq_losses, labels = _parse_paths(*ret)
         return data, sq_losses, labels
 
-    apps = ['voicehd', 'mnist', 'language', 'hdchog-fashionmnist']
+    apps = ['voicehd', 'mnist', 'language', 'hdchog-fashionmnist', 'emg-all']
     data, sq_losses, labels = _get_data_from_apps(apps)
     # Make the benchmark name as they appear in the plot
-    apps = ['voicehd', 'mnist', 'language', 'hdchog']
-
-    # Handle the EMG dataset since it has different subjects
-    app = 'emg'
-    apps.append(app)
-    experiment_paths = []
-    signquantize_paths = []
-    reference_model_paths = []
-    experiment_paths.append(Path(f'_transformation/{app}/hdc/all/deviation'))
-    signquantize_paths.append(Path(f'_transformation/{app}/hdc/all/signquantize/amsq-d{dim}'))
-    reference_model_paths.append(Path(f'_accuracy/{app}/hdc/all/map-encf32-amf32-d{dim}'))
-    emg_data, emg_sq_losses, _ = _parse_paths(experiment_paths, reference_model_paths, signquantize_paths)
-    data += emg_data
-    sq_losses += emg_sq_losses
+    apps = ['voicehd', 'mnist', 'language', 'hdchog', 'emg']
 
     # Handle GraphHD datasets also
     apps.append('graphhd')
@@ -1666,15 +1651,14 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    #figure_normal_distribution()
-    #figure_error_deviation()
-    #figure_compaction()
+    figure_normal_distribution()
+    figure_error_deviation()
     figure_tqhd_vs_all()
-    #figure_noise()
+    figure_noise()
 
     # Suplementary deviation experiment
     # This loops extends the design space exploration to also sweep dimensions
-    # in D=[2K, 10K].
+    # in the range D=[2K, 10K].
     #for i in range(2000, 10000+1, 1000):
     #    figure_error_deviation(i, suplementary=True)
 
