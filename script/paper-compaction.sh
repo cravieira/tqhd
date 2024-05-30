@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Evaluate TQHD compression capabilities
+# Evaluate TQHD compression capabilities with Run Length Encoding
 # This script trains models with dfferent random seeds and then quantize them
 # using TQHD choosing different number of bits. The quantized models
 # are evaluated with different compression parameters. The results are saved in
