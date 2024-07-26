@@ -116,6 +116,10 @@ def main():
         dtype_am = torch.bool
         model_name = f'{vsa.lower()}-d{args.vector_size}.pt'
 
+    if vsa == 'FHRR':
+        dtype_enc = torch.complex64
+        dtype_am = torch.complex64
+
     Path(args.model_dir).mkdir(parents=True, exist_ok=True)
     model_path = args.model_dir+'/'+model_name
 

@@ -118,6 +118,101 @@ class AMMap(BaseAM):
         """
         self.weight[idx] = self.weight[idx] - input
 
+class AMHrr(BaseAM):
+    """
+    Associative Memory for HRR VSAs.
+    """
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            dtype=torch.get_default_dtype(),
+            device=None,
+            **kwargs
+            ):
+        self.vsa = 'HRR'
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__(num_classes, dtype, **kwargs)
+        self.weight = torch.zeros((num_classes, dim), **factory_kwargs)
+        self.am = self.weight
+        self.dim = dim
+
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        self.am = self.weight
+
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        #query = torchhd.hard_quantize(query)
+        logit = torchhd.cosine_similarity(query, self.am)
+        #logit = torchhd.hamming_similarity(query, self.am)
+        return logit
+
+    def add(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Add the input tensors to the AM class.
+        """
+        #input = torchhd.hard_quantize(input)
+        self.weight[idx] = self.weight[idx] + input
+
+    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Sub the input tensors from the given AM classes.
+        """
+        self.weight[idx] = self.weight[idx] - input
+
+class AMFhrr(BaseAM):
+    """
+    Associative Memory for FHRR VSAs.
+    """
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            dtype=torch.complex64,
+            device=None,
+            **kwargs
+            ):
+        self.vsa = 'FHRR'
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__(num_classes, dtype, **kwargs)
+        self.weight = torch.zeros((num_classes, dim), **factory_kwargs)
+        self.am = self.weight
+        self.dim = dim
+
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        self.am = self.weight
+
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        #query = torchhd.hard_quantize(query)
+        logit = torchhd.cosine_similarity(query, self.am)
+        #logit = torchhd.hamming_similarity(query, self.am)
+        return logit
+
+    def add(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Add the input tensors to the AM class.
+        """
+        #input = torchhd.hard_quantize(input)
+        self.weight[idx] = self.weight[idx] + input
+
+    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+        """
+        Sub the input tensors from the given AM classes.
+        """
+        self.weight[idx] = self.weight[idx] - input
+
+
 class _Accumulator():
     """
     Helper class to implement BSC majority without needing to keep all operand

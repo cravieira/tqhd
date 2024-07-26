@@ -80,6 +80,10 @@ def main():
     Path(args.model_dir).mkdir(parents=True, exist_ok=True)
     model_path = args.model_dir+'/'+model_name
 
+    if vsa == 'FHRR':
+        dtype_enc = torch.complex64
+        dtype_am = torch.complex64
+
     if args.redirect_stdout:
         log_path = model_path.removesuffix('.pt')+'.log'
         common.redirect_stdout(log_path)

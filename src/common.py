@@ -6,7 +6,7 @@ import itertools
 from pathlib import Path
 import sys
 from typing import Callable, Generator, Optional, List
-from am.am import AMMap, AMBsc, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
+from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -190,7 +190,7 @@ def map_dtype(key: str):
 
 def add_default_hdc_arguments(parser: ArgumentParser):
     # Default HDC model tuning parameters
-    vsa_type = [ 'MAP', 'BSC' ]
+    vsa_type = [ 'MAP', 'BSC', 'HRR', 'FHRR']
     default_vsa = 'MAP'
     default_dtype_enc = 'f32'
     default_dtype_am = 'f32'
@@ -409,6 +409,10 @@ def pick_am_model(
             am = AMMap(dim, num_classes, learning=learning, **kwargs)
         elif vsa == 'BSC':
             am = AMBsc(dim, num_classes, learning=learning, prediction=prediction, **kwargs)
+        elif vsa == 'HRR':
+            am = AMHrr(dim, num_classes, learning=learning, **kwargs)
+        elif vsa == 'FHRR':
+            am = AMFhrr(dim, num_classes, learning=learning, **kwargs)
 
     elif am_type == 'TQHD':
         bits = kwargs['am_bits']
