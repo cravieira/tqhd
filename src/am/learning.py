@@ -62,13 +62,19 @@ class OnlineHD(BaseLearningStrategy):
     """
     def __init__(self, learning_rate=1.0):
         self.lr = learning_rate
-        self._supported_vsas = ['MAP', 'FHRR']
+        self._supported_vsas = ['MAP', 'FHRR', 'BSC']
 
     def update(self, am: 'BaseAM', input: Tensor, target: Tensor, retrain=False):
         if am.vsa not in self._supported_vsas:
             raise RuntimeError(f'OnlineHD is only supported with {self._supported_vsas} AMs.')
 
         logit = am.search(input)
+        if am.vsa == 'BSC':
+            # Transform logit from a hamming distance value defined in [0, D]
+            # to a cosine like similarity [-1, 1]
+            dim = input.shape[-1]
+            logit = (2*logit - dim) / dim
+
         pred = logit.argmax(1)
         is_wrong = target != pred
 
@@ -85,7 +91,13 @@ class OnlineHD(BaseLearningStrategy):
         alpha1 = 1.0 - logit.gather(1, target.unsqueeze(1))
         alpha2 = logit.gather(1, pred.unsqueeze(1)) - 1.0
 
-        am.add(self.lr * alpha1 * input, target)
-        am.add(self.lr * alpha2 * input, pred)
+        if am.vsa != 'BSC':
+            am.add(self.lr * alpha1 * input, target)
+            am.add(self.lr * alpha2 * input, pred)
+        else:
+            bip_input = torch.where(input.to(torch.int) > 0, 1, -1)
+            am.add(self.lr * alpha1 * bip_input, target, weight=self.lr*alpha1)
+            am.add(self.lr * alpha2 * bip_input, pred, weight=-self.lr*alpha2)
 
         am.train_am()
+

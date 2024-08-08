@@ -225,19 +225,22 @@ class _Accumulator():
         self._need_update = True # Control flag
         self._cache = None # Bundled tensor
 
-    def add(self, input: torch.Tensor):
+    def add(self, input: torch.Tensor, weight=1, **kwargs):
         """docstring for add"""
         self.acc = self.acc + input
-        self.elements += 1
+        self.elements += weight
         self._need_update = True
 
-    def sub(self, input: torch.Tensor):
+    def sub(self, input: torch.Tensor, weight=1, **kwargs):
         """docstring for add"""
         self.acc = self.acc - input
-        self.elements -= 1
+        self.elements -= weight
         self._need_update = True
 
     def _maj(self):
+        # New WIP version with bipolar accumulators
+        return torch.greater(self.acc, 0).to(torch.int)
+
         """docstring for _maj"""
         n = self.elements
 
@@ -284,7 +287,8 @@ class AMBsc(BaseAM):
         self.vsa = 'BSC'
         super().__init__(num_classes, dtype, **kwargs)
         self.accumulators = [_Accumulator(dim, device=device) for _ in range(num_classes)]
-        self.am = None
+        #self.am = None
+        self.train_am()
 
     def train_am(self):
         """
@@ -301,23 +305,30 @@ class AMBsc(BaseAM):
         logit = torchhd.hamming_similarity(query, am)
         return logit
 
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Add the input tensors to the AM class.
         """
         #for i in range(len(idx)):
         #    self.accumulators[idx[i]].add(input[i])
         # Non-batched implementation
-        self.accumulators[idx].add(input)
+        t = self._bipolarize(input)
+        self.accumulators[idx].add(t, **kwargs)
 
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Sub the input tensors from the given AM classes.
         """
         #for i in range(len(idx)):
         #    self.accumulators[idx[i]].add(input[i])
         # Non-batched implementation
-        self.accumulators[idx].add(torch.logical_not(input))
+        self.accumulators[idx].add(torch.logical_not(input), **kwargs)
+
+    def _bipolarize(self, input: torch.Tensor) -> torch.Tensor:
+        # Do nothing if the input is non-binary
+        if torch.any(input<0):
+            return input
+        return torch.where(input.to(torch.int) > 0, 1, -1)
 
 # Quantization AMs #
 # These AMs are experimental models that perform quantization. The goal is to
