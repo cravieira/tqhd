@@ -12,7 +12,7 @@ import torchmetrics
 from tqdm import tqdm
 from patchmodel import transform_am
 
-from am.learning import Centroid, CentroidOnline
+from am.learning import Centroid, CentroidOnline, OnlineHD
 from am.prediction import Fault, Normal
 
 _current_pytorch_device = "cpu"
@@ -297,7 +297,7 @@ def add_am_arguments(parser: ArgumentParser):
             'computing the norm.'
             )
 
-    learning_types = ['Centroid', 'CentroidOnline']
+    learning_types = ['Centroid', 'CentroidOnline', 'OnlineHD']
     default_learning = 'Centroid'
     group.add_argument(
             '--am-learning',
@@ -305,6 +305,15 @@ def add_am_arguments(parser: ArgumentParser):
             choices=learning_types,
             type=str,
             help=f'Chooses the learning strategy used by the AM. Defaults to {default_learning}.'
+            )
+
+    # Learning rate used in OnlineHD
+    default_onlinehd_lr = 1.0
+    group.add_argument(
+            '--am-onlinehd-lr',
+            default=default_onlinehd_lr,
+            type=float,
+            help=f'Chooses the learning rate used by the OnlineHD strategy. Defaults to {default_onlinehd_lr}.'
             )
 
     prediction_types = ['Normal', 'Fault']
@@ -370,11 +379,33 @@ def args_pick_learning(args):
         learning = Centroid()
     elif args.am_learning == 'CentroidOnline':
         learning = CentroidOnline()
+    elif args.am_learning == 'OnlineHD':
+        lr = args.am_onlinehd_lr
+        learning = OnlineHD(lr)
     else:
         RuntimeError(f"Invalid learning strategy \"{args.am_learning}\"")
 
     return learning
 
+def pick_learning(
+        am_learning='Centroid',
+        **kwargs
+        ):
+    """
+    Get the learning strategy based on function arguments.
+    """
+    learning = None
+    if am_learning == 'Centroid':
+        learning = Centroid()
+    elif am_learning == 'CentroidOnline':
+        learning = CentroidOnline()
+    elif am_learning == 'OnlineHD':
+        lr = kwargs['am_onlinehd_lr']
+        learning = OnlineHD(lr)
+    else:
+        RuntimeError(f"Invalid learning strategy \"{am_learning}\"")
+
+    return learning
 
 def args_pick_prediction(args):
     """
@@ -397,7 +428,7 @@ def pick_am_model(
     learning = None
     prediction = None
 
-    learning = Centroid()
+    learning = pick_learning(am_learning, **kwargs)
 
     if am_prediction == 'Normal':
         prediction = Normal()

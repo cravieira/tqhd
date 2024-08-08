@@ -52,11 +52,11 @@ class BaseAM(ABC, torch.nn.Module):
         pass
 
     @abstractmethod
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         pass
 
     @abstractmethod
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         pass
 
     def update(self, input: torch.Tensor, idx: torch.Tensor, retrain=False):
@@ -105,14 +105,14 @@ class AMMap(BaseAM):
         #logit = torchhd.hamming_similarity(query, self.am)
         return logit
 
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Add the input tensors to the AM class.
         """
         #input = torchhd.hard_quantize(input)
         self.weight[idx] = self.weight[idx] + input
 
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Sub the input tensors from the given AM classes.
         """
@@ -152,14 +152,14 @@ class AMHrr(BaseAM):
         #logit = torchhd.hamming_similarity(query, self.am)
         return logit
 
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Add the input tensors to the AM class.
         """
         #input = torchhd.hard_quantize(input)
         self.weight[idx] = self.weight[idx] + input
 
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Sub the input tensors from the given AM classes.
         """
@@ -199,14 +199,14 @@ class AMFhrr(BaseAM):
         #logit = torchhd.hamming_similarity(query, self.am)
         return logit
 
-    def add(self, input: torch.Tensor, idx: torch.Tensor):
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Add the input tensors to the AM class.
         """
         #input = torchhd.hard_quantize(input)
         self.weight[idx] = self.weight[idx] + input
 
-    def sub(self, input: torch.Tensor, idx: torch.Tensor):
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
         """
         Sub the input tensors from the given AM classes.
         """

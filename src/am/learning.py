@@ -55,3 +55,37 @@ class CentroidOnline(Centroid):
             # Update AM in use for the subsequent predictions in the
             # retraining loop
             am.train_am()
+
+class OnlineHD(BaseLearningStrategy):
+    """
+    Centroid learning strategy. Adapted from torchhd source code.
+    """
+    def __init__(self, learning_rate=1.0):
+        self.lr = learning_rate
+        self._supported_vsas = ['MAP', 'FHRR']
+
+    def update(self, am: 'BaseAM', input: Tensor, target: Tensor, retrain=False):
+        if am.vsa not in self._supported_vsas:
+            raise RuntimeError(f'OnlineHD is only supported with {self._supported_vsas} AMs.')
+
+        logit = am.search(input)
+        pred = logit.argmax(1)
+        is_wrong = target != pred
+
+        # cancel update if all predictions were correct
+        if is_wrong.sum().item() == 0:
+            return
+
+        # only update wrongly predicted inputs
+        logit = logit[is_wrong]
+        input = input[is_wrong]
+        target = target[is_wrong]
+        pred = pred[is_wrong]
+
+        alpha1 = 1.0 - logit.gather(1, target.unsqueeze(1))
+        alpha2 = logit.gather(1, pred.unsqueeze(1)) - 1.0
+
+        am.add(self.lr * alpha1 * input, target)
+        am.add(self.lr * alpha2 * input, pred)
+
+        am.train_am()
