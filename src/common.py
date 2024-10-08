@@ -6,7 +6,8 @@ import itertools
 from pathlib import Path
 import sys
 from typing import Callable, Generator, Optional, List
-from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
+from torchhd.tensors.mcr import MCRTensor
+from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMMcr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -190,7 +191,7 @@ def map_dtype(key: str):
 
 def add_default_hdc_arguments(parser: ArgumentParser):
     # Default HDC model tuning parameters
-    vsa_type = [ 'MAP', 'BSC', 'HRR', 'FHRR']
+    vsa_type = [ 'MAP', 'BSC', 'HRR', 'FHRR', 'MCR']
     default_vsa = 'MAP'
     default_dtype_enc = 'f32'
     default_dtype_am = 'f32'
@@ -201,6 +202,12 @@ def add_default_hdc_arguments(parser: ArgumentParser):
             choices=vsa_type,
             default='MAP',
             help=f'Select the used VSA model. Defaults to \"{default_vsa}\".'
+            )
+    default_mcr_mod = 4
+    parser.add_argument('--vsa-mcr-mod',
+            default=default_mcr_mod,
+            type=int,
+            help=f'Select the number of points used to quantize the unit circle in MCR VSA. Defaults to \"{default_mcr_mod}\".'
             )
     parser.add_argument('--dtype-enc',
             choices=_map_dtype.keys(),
@@ -361,6 +368,43 @@ def add_am_arguments(parser: ArgumentParser):
             help=f'Sigma threshold used in QuantHD ternary model projection. Defaults to {default_quanthd_tri_threshold}.'
             )
 
+def args_parse_vsa(args):
+    """Parse VSA related arguments."""
+    kwargs = {}
+    vsa = args.vsa
+    dtype_enc = None
+    dtype_am = None
+
+    def _check_dtype(dtype, options, vsa):
+        if dtype not in options:
+            raise RuntimeError(f'Cannot use type {dtype} with {vsa} VSA. Available options are: {options}.')
+
+    args_enc = map_dtype(args.dtype_enc)
+    args_am = map_dtype(args.dtype_am)
+
+    if vsa == "MAP":
+        dtype_enc = args_enc
+        dtype_am = args_am
+    elif vsa == "BSC":
+        dtype_enc = torch.bool
+        dtype_am = torch.bool
+    elif vsa == 'FHRR':
+        dtype_enc = torch.complex64
+        dtype_am = torch.complex64
+    elif vsa == 'MCR':
+        options = MCRTensor.supported_dtypes
+        _check_dtype(args_enc, options, vsa)
+        _check_dtype(args_am, options, vsa)
+        dtype_enc = args_enc
+        dtype_am = args_am
+        kwargs['mod'] = args.vsa_mcr_mod
+
+    kwargs['vsa'] = vsa
+    kwargs['dtype_enc'] = dtype_enc
+    kwargs['dtype_am'] = dtype_am
+
+    return kwargs
+
 def parse_am_group(parser, args):
     arg_groups={}
     for group in parser._action_groups:
@@ -444,6 +488,8 @@ def pick_am_model(
             am = AMHrr(dim, num_classes, learning=learning, **kwargs)
         elif vsa == 'FHRR':
             am = AMFhrr(dim, num_classes, learning=learning, **kwargs)
+        elif vsa == 'MCR':
+            am = AMMcr(dim, num_classes, learning=learning, **kwargs)
 
     elif am_type == 'TQHD':
         bits = kwargs['am_bits']
