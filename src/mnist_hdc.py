@@ -38,24 +38,33 @@ class Mnist_HDC(nn.Module):
         self.vsa: VSAOptions = vsa
 
         self.flatten = torch.nn.Flatten()
-        self.position = embeddings.Random(image_size, dimensions, vsa=self.vsa, dtype=self.dtype_enc)
-        self.value = embeddings.Thermometer(levels, dimensions, vsa=self.vsa, dtype=self.dtype_enc)
+        self.position = embeddings.Random(image_size, dimensions, vsa=self.vsa, dtype=self.dtype_enc, **kwargs)
+        self.value = embeddings.Thermometer(levels, dimensions, vsa=self.vsa, dtype=self.dtype_enc, **kwargs)
 
         num_classes = 10
         self.am = common.pick_am_model(vsa, dimensions, num_classes, **kwargs)
+
+        # WIP: Support to MCR
+        self.vsa_kwargs = {}
+        if vsa == 'MCR':
+            self.vsa_kwargs['mod'] = kwargs['mod']
 
     def create_am(self):
         self.am.train_am()
 
     def encode(self, x):
         x = self.flatten(x)
-        sample_hv = torchhd.bind(self.position.weight, self.value(x))
-        sample_hv = torchhd.multiset(sample_hv)
+        sample_hv = torchhd.bind(self.position.weight, self.value(x), **self.vsa_kwargs)
+        sample_hv = torchhd.multiset(sample_hv, **self.vsa_kwargs)
         return sample_hv
+
+    def search(self, x):
+        return self.am.search(x)
 
     def forward(self, x):
         enc = self.encode(x)
-        return self.am.search(enc)
+        return self.search(enc)
+
 
 def main():
     # Enable parser #
@@ -67,26 +76,27 @@ def main():
     args = parser.parse_args()
     am_args = common.parse_am_group(parser, args)
 
-    vsa = args.vsa
-    if vsa != "BSC":
-        dtype_enc = common.map_dtype(args.dtype_enc)
-        dtype_am = common.map_dtype(args.dtype_am)
-        model_name = f'{vsa.lower()}-enc{args.dtype_enc}-am{args.dtype_am}-d{args.vector_size}.pt'
-    else:
-        dtype_enc = torch.bool
-        dtype_am = torch.bool
-        model_name = f'{vsa.lower()}-d{args.vector_size}.pt'
+    vsa_args = common.args_parse_vsa(args)
+    #vsa = args.vsa
+    #if vsa != "BSC":
+    #    dtype_enc = common.map_dtype(args.dtype_enc)
+    #    dtype_am = common.map_dtype(args.dtype_am)
+    #    model_name = f'{vsa.lower()}-enc{args.dtype_enc}-am{args.dtype_am}-d{args.vector_size}.pt'
+    #else:
+    #    dtype_enc = torch.bool
+    #    dtype_am = torch.bool
+    #    model_name = f'{vsa.lower()}-d{args.vector_size}.pt'
 
     Path(args.model_dir).mkdir(parents=True, exist_ok=True)
-    model_path = args.model_dir+'/'+model_name
+    #model_path = args.model_dir+'/'+model_name
 
-    if vsa == 'FHRR':
-        dtype_enc = torch.complex64
-        dtype_am = torch.complex64
+    #if vsa == 'FHRR':
+    #    dtype_enc = torch.complex64
+    #    dtype_am = torch.complex64
 
-    if args.redirect_stdout:
-        log_path = model_path.removesuffix('.pt')+'.log'
-        common.redirect_stdout(log_path)
+    #if args.redirect_stdout:
+    #    log_path = model_path.removesuffix('.pt')+'.log'
+    #    common.redirect_stdout(log_path)
 
     common.set_random_seed(args.seed)
     device = common.set_device(args.device)
@@ -104,9 +114,10 @@ def main():
             args.vector_size,
             IMG_SIZE*IMG_SIZE,
             LEVELS,
-            vsa=vsa,
-            dtype_enc=dtype_enc,
-            dtype_am=dtype_am,
+            #vsa=vsa,
+            #dtype_enc=dtype_enc,
+            #dtype_am=dtype_am,
+            **vsa_args,
             **am_args
             )
     model = common.args_pick_model(args, constructor)
