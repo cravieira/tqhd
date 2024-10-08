@@ -6,6 +6,8 @@ import itertools
 from pathlib import Path
 import sys
 from typing import Callable, Generator, Optional, List
+import gc
+
 from torchhd.tensors.mcr import MCRTensor
 from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMMcr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
@@ -172,6 +174,21 @@ def add_default_arguments(parser: ArgumentParser):
             'is disabled by default and can substantially increase retraining'
             'speed at the cost of memory. This strategy is better suitted to'
             'CPU execution.'
+            )
+
+    parser.add_argument(
+            '--no-encode-cache',
+            action='store_true',
+            default=False,
+            help='Disable the use of cached encoded train and test datasets.'
+            )
+
+    default_cache_dir = '_cache'
+    parser.add_argument(
+            '--cache-dir',
+            type=str,
+            default=default_cache_dir,
+            help=f'Change the directory used for cached datasets. Defaults to f{default_cache_dir}.'
             )
 
     return parser
@@ -682,11 +699,15 @@ def _train_loop(model, train_ld, device, retrain=False, desc='Training'):
     """
     Simple train loop. Iterate over the dataset and update AM
     """
+    cache_ds = type(train_ld.dataset) == CacheDataset
     for samples, labels in tqdm(train_ld, desc=desc):
         samples = samples.to(device)
         labels = labels.to(device)
 
-        samples_hv = model.encode(samples)
+        if not cache_ds:
+            samples_hv = model.encode(samples)
+        else:
+            samples_hv = samples
         model.am.update(samples_hv, labels, retrain=retrain)
 
     return model
@@ -757,6 +778,7 @@ def train_hdc(
             # Choose between the pytorch loader and the dataset stored in memory
             retrain_loader = dataset if dataset else train_ld
 
+            cache_loader = type(train_ld.dataset) == CacheDataset
             # Regular training loop
             for samples, labels in tqdm(retrain_loader, desc=f'Retraining {i}'):
                 samples = samples.to(device)
@@ -766,7 +788,10 @@ def train_hdc(
                 if retrain and retrain_cache:
                     samples_hv = samples
                 else:
-                    samples_hv = model.encode(samples)
+                    if cache_loader:
+                        samples_hv = samples
+                    else:
+                        samples_hv = model.encode(samples)
 
                 model.am.update(samples_hv, labels, retrain=retrain)
 
@@ -806,13 +831,17 @@ def train_hdc(
 def test_hdc(model, test_ld, num_classes, device):
     accuracy = torchmetrics.Accuracy("multiclass", num_classes=num_classes)
     model.to(device)
+    cache_ds = type(test_ld.dataset) == CacheDataset
 
     with torch.no_grad():
         for samples, labels in tqdm(test_ld, desc='Testing'):
             samples = samples.to(device)
             labels = labels.to(device)
 
-            outputs = model(samples)
+            if not cache_ds:
+                outputs = model(samples)
+            else:
+                outputs = model.search(samples)
             outputs = outputs.type(torch.float)
             accuracy.update(outputs, labels)
 
@@ -832,6 +861,96 @@ def args_retrain_acc_dumper(args):
                 args.retrain_dump_acc_suffix)
     return retrain_acc_dumper
 
+class CacheDataset(torch.utils.data.Dataset):
+    """docstring for CacheDataLoader"""
+    def __init__(self, path):
+        super(CacheDataset, self).__init__()
+        self.path = path
+        self._path_data = f'{self.path}/data.pt'
+        self._data = self._load_dataset(self._path_data)
+        self._labels = torch.load(f'{self.path}/label.pt', weights_only=False)
+
+        if self._data.shape[0] != self._labels.shape[0]:
+            raise RuntimeError('Failed to load CachedDataset.')
+
+        self._len = self._data.shape[0]
+
+        self._data_counter = 0
+        self._max_samples = 15000
+        self._partial_dataset = True if self._len > self._max_samples else False
+
+    def __len__(self):
+        return self._len
+
+    def __getitem__(self, idx):
+        self._increment_dataset_counter()
+        data = self._data[idx].detach().clone()
+        label = self._labels[idx].detach().clone()
+        return data, label
+
+    def _load_dataset(self, path: str) -> torch.Tensor:
+        return torch.load(path, map_location="cpu", mmap=True, weights_only=False)
+
+    def _increment_dataset_counter(self, i=1):
+        self._data_counter += i
+        if self._data_counter > self._max_samples:
+            self._data = self._load_dataset(self._path_data)
+            self._data_counter = 0
+
+def args_cache_loader(args, model, loader):
+    """Return a loader to the dataset cache for the given model."""
+    device = args.device
+    cache_dir = args.cache_dir
+
+    dataset_name = type(loader.dataset).__name__
+    model_class = type(model).__name__
+    model_name = model.vsa
+    if model_name == 'MCR':
+        model_name = f'{model_name}-mcr{model.vsa_kwargs["mod"]}'
+    dim = model.dimensions
+    dtype_enc = model.dtype_enc
+    dataset_type = 'train' if loader.dataset.train else 'test'
+    seed = args.seed
+
+    dir = Path(f'{cache_dir}/{dataset_name}-{model_class}-{model_name}-dim{dim}-enc{dtype_enc}-seed{seed}/{dataset_type}')
+
+    # Create a cache for the given model and loader
+    if not dir.exists():
+        create_path(dir)
+
+        sample_list = [] # WIP: entire dataset test
+        label_list = []
+        sample_tensor = None
+        for samples, labels in tqdm(loader, desc='Caching dataset...'):
+            samples = samples.to(device)
+            labels = labels.to(device)
+
+            samples_hv = model.encode(samples)
+
+            sample_list.append(samples_hv[0].cpu())
+            label_list.append(labels[0].cpu())
+
+        sample_tensor = torch.stack(sample_list)
+        label_tensor = torch.stack(label_list)
+        torch.save(sample_tensor, f'{dir}/data.pt')
+        torch.save(label_tensor, f'{dir}/label.pt')
+        del sample_tensor
+        del label_tensor
+        gc.collect()
+
+    # Return a cache loader
+    ds = CacheDataset(dir)
+    # Set shuffle in accordance to common.load_dataset()
+    shuffle = False if loader.dataset.train else True
+    ld = torch.utils.data.DataLoader(
+            ds,
+            batch_size=loader.batch_size,
+            generator=loader.generator,
+            num_workers=loader.num_workers,
+            shuffle=shuffle)
+
+    return ld
+
 def args_train_hdc(args, model, train_ld, test_ld=None):
     '''
     High level function to control training according to the parameters given
@@ -843,6 +962,12 @@ def args_train_hdc(args, model, train_ld, test_ld=None):
     # Does the user want to save the accuracy on the test dataset at the end of
     # each retraining round?
     retrain_acc_dumper = args_retrain_acc_dumper(args)
+
+    # If encode cache is enabled, use custom train and data loaders
+    if args.no_encode_cache == False:
+        train_ld = args_cache_loader(args, model, train_ld)
+        if test_ld:
+            test_ld = args_cache_loader(args, model, test_ld)
 
     return train_hdc(
             model,
@@ -861,4 +986,9 @@ def args_test_hdc(args, model, test_ld, num_classes) -> Optional[float]:
     '''
     if args.skip_test:
         return None
+
+    # If encode cache is enabled, use custom train and data loaders
+    if args.no_encode_cache == False:
+        test_ld = args_cache_loader(args, model, test_ld)
+
     return test_hdc(model, test_ld, num_classes, device=args.device)
