@@ -8,8 +8,9 @@ import sys
 from typing import Callable, Generator, Optional, List
 import gc
 
-from torchhd.tensors.mcr import MCRTensor
-from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMMcr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
+from torchhd.functional import ensure_vsa_tensor
+from torchhd.tensors.mcr import BaseMCRTensor
+from am.am import AMMap, AMBsc, AMHrr, AMFhrr, AMMcr, AMCgr, AMSignQuantize, AMThermometer, AMThermometerDeviation, PQHDC, QuantHDBin, QuantHDTri
 import torch
 import torchmetrics
 from tqdm import tqdm
@@ -208,7 +209,7 @@ def map_dtype(key: str):
 
 def add_default_hdc_arguments(parser: ArgumentParser):
     # Default HDC model tuning parameters
-    vsa_type = [ 'MAP', 'BSC', 'HRR', 'FHRR', 'MCR']
+    vsa_type = [ 'MAP', 'BSC', 'HRR', 'FHRR', 'MCR', 'CGR']
     default_vsa = 'MAP'
     default_dtype_enc = 'f32'
     default_dtype_am = 'f32'
@@ -224,7 +225,7 @@ def add_default_hdc_arguments(parser: ArgumentParser):
     parser.add_argument('--vsa-mcr-mod',
             default=default_mcr_mod,
             type=int,
-            help=f'Select the number of points used to quantize the unit circle in MCR VSA. Defaults to \"{default_mcr_mod}\".'
+            help=f'Select the number of points used to quantize the unit circle in MCR/CGR VSA. Defaults to \"{default_mcr_mod}\".'
             )
     parser.add_argument('--dtype-enc',
             choices=_map_dtype.keys(),
@@ -408,8 +409,8 @@ def args_parse_vsa(args):
     elif vsa == 'FHRR':
         dtype_enc = torch.complex64
         dtype_am = torch.complex64
-    elif vsa == 'MCR':
-        options = MCRTensor.supported_dtypes
+    elif vsa == 'MCR' or vsa == 'CGR':
+        options = BaseMCRTensor.supported_dtypes
         _check_dtype(args_enc, options, vsa)
         _check_dtype(args_am, options, vsa)
         dtype_enc = args_enc
@@ -507,6 +508,8 @@ def pick_am_model(
             am = AMFhrr(dim, num_classes, learning=learning, **kwargs)
         elif vsa == 'MCR':
             am = AMMcr(dim, num_classes, learning=learning, **kwargs)
+        elif vsa == 'CGR':
+            am = AMCgr(dim, num_classes, learning=learning, **kwargs)
 
     elif am_type == 'TQHD':
         bits = kwargs['am_bits']
@@ -877,6 +880,7 @@ class CacheDataset(torch.utils.data.Dataset):
 
         self._data_counter = 0
         self._max_samples = 15000
+        self._max_samples = 60001
         self._partial_dataset = True if self._len > self._max_samples else False
 
     def __len__(self):
@@ -905,7 +909,7 @@ def args_cache_loader(args, model, loader):
     dataset_name = type(loader.dataset).__name__
     model_class = type(model).__name__
     model_name = model.vsa
-    if model_name == 'MCR':
+    if model_name == 'MCR' or model_name == 'CGR':
         model_name = f'{model_name}-mcr{model.vsa_kwargs["mod"]}'
     dim = model.dimensions
     dtype_enc = model.dtype_enc

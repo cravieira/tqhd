@@ -49,7 +49,7 @@ class VoiceHD_HDC(nn.Module):
 
         # WIP: Support to MCR
         self.vsa_kwargs = {}
-        if vsa == 'MCR':
+        if vsa == 'MCR' or vsa == 'CGR':
             self.vsa_kwargs['mod'] = kwargs['mod']
 
     def create_am(self):

@@ -3,7 +3,7 @@ from enum import Enum, auto
 import math
 import torch
 import torchhd
-from torchhd import MCRTensor
+from torchhd import MCRTensor, CGRTensor
 import logging
 
 from .learning import Centroid
@@ -270,6 +270,62 @@ class AMMcr(BaseAM):
         Sub the input tensors from the given AM classes.
         """
         t = MCRTensor.mcr_to_complex(input, self.mod)
+        self.weight[idx] = self.weight[idx] - t
+
+
+class AMCgr(BaseAM):
+    """
+    Associative Memory for Modular Composite Representation VSAs.
+    """
+    def __init__(
+            self,
+            dim,
+            num_classes,
+            mod,
+            dtype=torch.int32,
+            device=None,
+            **kwargs
+            ):
+        super().__init__(num_classes, dtype, **kwargs)
+        self.vsa = 'CGR'
+        self.mod = mod
+        # Use complex number for accumulation
+        factory_kwargs = {"device": device, "dtype": torch.complex64}
+        self.weight = torch.zeros((num_classes, dim), **factory_kwargs)
+        self.train_am()
+        self.dim = dim
+
+    def train_am(self):
+        """
+        Finish AM train and enable it to execute searches.
+        """
+        # Convert from the inner complex representation to MCR
+        self.am = CGRTensor.complex_to_mcr(self.weight, self.mod)
+        am_complex = CGRTensor.mcr_to_complex(self.am, self.mod)
+        self.am_complex = torchhd.ensure_vsa_tensor(am_complex, vsa='FHRR')
+
+    def search(self, query: torch.Tensor):
+        """
+        Search the AM for the most similar vector to query.
+        """
+        #logit = torchhd.cosine_similarity(query, self.am)
+        logit = CGRTensor.manhattan_similarity(query, self.am, self.mod)
+
+        return logit
+
+    def add(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
+        """
+        Add the input tensors to the AM class.
+        """
+        #input = torchhd.hard_quantize(input)
+        t = CGRTensor.mcr_to_complex(input, self.mod)
+        self.weight[idx] = self.weight[idx] + t
+
+    def sub(self, input: torch.Tensor, idx: torch.Tensor, **kwargs):
+        """
+        Sub the input tensors from the given AM classes.
+        """
+        t = CGRTensor.mcr_to_complex(input, self.mod)
         self.weight[idx] = self.weight[idx] - t
 
 
