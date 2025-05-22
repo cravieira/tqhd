@@ -1,5 +1,13 @@
 #!/usr/bin/python3
 
+'''
+During research, we considered using a simple Run-length encoding (RLE) method
+for TQHD's hypervector compression. However, the results perfomed slightly
+worse than the final compression approach shown in the paper. Therefore, the
+source code presented here is not used in the final work. This file is kept in
+the repository for legacy purposes.
+'''
+
 import torch
 import common
 from hdc_models import *
