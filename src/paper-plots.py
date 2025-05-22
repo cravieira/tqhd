@@ -1656,12 +1656,26 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    #figure_normal_distribution()
-    #figure_error_deviation()
     figure_tqhd_vs_all()
     figure_noise()
 
-    # Suplementary deviation experiment
+    # Unused figures #
+
+    # This figure wasn't used in the final version. It shows how query vectors
+    # and AM vectors converge to a gaussian distribution in the range
+    # [-3sigma, 3sigma]. It is the observation behind the properties discussed
+    # in Section IV.
+    #figure_normal_distribution()
+
+
+    # This figure shows TQHD accuracy variation when selecting different
+    # quantization ranges based on standard deviation. In the paper, we state
+    # that the range [-1sigma, 1sigma] provides good results. The statement
+    # arises from this figure, which was removed from the final version due to
+    # size restrictions. The experiment fixes the hypervector size to D=1K.
+    #figure_error_deviation()
+
+    # Suplementary deviation experiment #
     # This loops extends the design space exploration to also sweep dimensions
     # in the range D=[2K, 10K].
     #for i in range(2000, 10000+1, 1000):
