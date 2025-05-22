@@ -1,5 +1,7 @@
 # TQHD
 
+Source code for the paper "TQHD: Thermometer Encoding Based Quantization for Hyperdimensional Computing", to appear at IEEE Computer Society Annual Symposium on VLSI (ISVLSI) 2025.
+
 ## Setup
 
 Clone this repository and init submodules.
@@ -7,7 +9,7 @@ Clone this repository and init submodules.
 git submodule update --init --recursive
 ```
 
-This repository uses Python, pip, virtual environments, and GNU parallel to run model training. If you are on Ubuntu 22.04, you can run `./setup.sh` to download dependencies and set up the environment. If not, then you must download dependencies and setup the virtual environment as done in `setup.sh` script:
+This repository uses Python, pip, virtual environments, and GNU parallel to run model training. If you are on Ubuntu 22.04, you can run `./setup.sh` to download dependencies and set up the environment. If not, then you must download dependencies and setup the virtual environment according to the instructions in `setup.sh` script:
 ```bash
 # Download dependencies
 sudo apt install -y python3 pip3 python3-venv parallel
@@ -21,12 +23,12 @@ pip install -e torchhd
 deactivate
 ```
 
-After installing the dependencies, test the installation by executing all models and download their datasets:
+After installing the dependencies, test the installation with:
 ```
 ./paper-datasets.sh
 ```
 
-If `paper-datasets.sh` runs correctly, your environment is ready to run the experiments.
+The script downloads the required datasets and test the execution of all HDC applications required for the paper. If `paper-datasets.sh` runs correctly, your environment is ready to run the experiments.
 
 ## Running Experiments
 
@@ -45,9 +47,9 @@ There are several scripts to handle the experiments and they must be executed in
 ./paper-quanthd-min-epochs.sh
 ```
 
-Each script can be executed in parallel, and you can choose whether or not it should use Cuda. Please make sure to tune the parameters `JOBS` and `DEVICE` in each script according to your machine. Keep in mind that launching multiple jobs simultaneously requires not only CPU/GPU but also memory availability.
+Each script can be executed in parallel, and you can choose whether or not it should use Cuda. Please make sure to tune the parameters `JOBS` and `DEVICE` in each script according to your computer's resources. Keep in mind that launching multiple jobs simultaneously requires not only CPU/GPU but also memory availability.
 
-Finally, you can generate the plots and other results by running:
+Finally, you can obtain the plots and other results by running:
 
 ```bash
 ./paper-plots.sh
@@ -59,7 +61,7 @@ This section briefly introduces the script framework. More details about it can 
 
 ### Generated Directories
 
-All directories beginning with "\_" are considered *private*, and, thus, handled by the repository.
+All directories beginning with "\_" are considered *private*, and, thus, handled by the automation scripts.
 
 | Folder           | Meaning                                                |
 | :--------------: | :----------------------------------------------------: |
@@ -117,7 +119,7 @@ disable_venv
 
 ### Model Pool
 
-This repository takes advantage of model serialization to reduce training time. The idea is to train a model only once, serialize it into `_model`, and reuse its trained parameters as much as possible. For instance, a trained MAP floating-point model created by `paper-accuracy.sh` is used by `paper-tqhd.sh` to speed up TQHD evaluation since TQHD is a Post-Training Quantization (PTQ) method. The use of model pool creates the following dependency graph in script execution order:
+This repository takes advantage of model serialization to reduce training time. The idea is to train a model only once, serialize it into `_model`, and reuse its trained parameters as much as possible. For instance, a trained MAP floating-point model created by `paper-accuracy.sh` is consumed by `paper-tqhd.sh`since TQHD is a Post-Training Quantization (PTQ) method. Allowing model consumption by other scripts allow quickly evaluating TQHD under different parameters. The use of odel pool creates the following dependency graph in script execution order:
 
 ```mermaid
 flowchart TD
@@ -138,4 +140,5 @@ flowchart TD
 ```
 
 The script `paper-accuracy.sh` trains the high-precision MAP models. The trained models can be immediately quantized for multiple TQHD experiments. However, PQ-HDC requires that query vectors must be sign quantized at training time before the class bundle. Thus, it is necessary to create a separate pool of models for PQ-HDC.
+
 
