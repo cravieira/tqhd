@@ -991,7 +991,9 @@ def plot_tqhd_vs_pqhdc(
             nrows=3,
             ncols=2,
             #sharex=True,
-            figsize=(IEEE_column_width*2.5, IEEE_column_width*2)
+            #figsize=(IEEE_column_width*2.5, IEEE_column_width*2),
+            figsize=(IEEE_column_width*2.0, IEEE_column_width*1.5),
+            layout='constrained'
             )
 
     if colors is None:
@@ -1030,7 +1032,7 @@ def plot_tqhd_vs_pqhdc(
             ## TODO: This is a workaround to make the legend a little bit above
             ## the plots since matplotlib tight_layout is not working correctly
             ## for this plot.
-            ax.set_title(' ')
+            #ax.set_title(' ')
 
         # Place application name at the right of the plot
         ax.yaxis.set_label_position('right')
@@ -1083,7 +1085,7 @@ def plot_tqhd_vs_pqhdc(
     fig.supylabel('Accuracy Loss in pp')
     fig.supxlabel(xlabel)
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plot._plot(**kwargs)
 
 def figure_tqhd_vs_pqhdc():
@@ -1214,8 +1216,9 @@ def plot_accuracy(
     fig, axs = plt.subplots(
             nrows=rows,
             ncols=cols,
-            #sharex=True,
-            figsize=(IEEE_column_width*2.5, IEEE_column_width*2)
+            #figsize=(IEEE_column_width*2.5, IEEE_column_width*2),
+            figsize=(IEEE_column_width*2.0, IEEE_column_width*1.5),
+            layout='constrained'
             )
 
     if colors is None:
@@ -1257,18 +1260,18 @@ def plot_accuracy(
         for ax in axs.flatten():
             ax.set_xticks(xticks_pos, labels=xticks_labels)
 
-    # TODO: This is a workaround to make the legend a little bit above
-    # the plots since matplotlib tight_layout is not working correctly
-    # for this plot.
-    for ax in axs.flatten():
-        ax.set_title(' ')
+    ## TODO: This is a workaround to make the legend a little bit above
+    ## the plots since matplotlib tight_layout is not working correctly
+    ## for this plot.
+    #for ax in axs.flatten():
+    #    ax.set_title(' ')
     if legend_dict:
         fig.legend(**legend_dict, loc='outside upper center', fontsize='small')
 
     fig.supylabel('Accuracy Loss in pp')
     fig.supxlabel(xlabel)
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plot._plot(**kwargs)
 
 def figure_tqhd_vs_all():
@@ -1341,7 +1344,8 @@ def figure_tqhd_vs_all():
 
         return losses
 
-    losses_tqhd = _parse_transformation_technique('paper-tqhd', acc_ref, emg_all=True)
+    #losses_tqhd = _parse_transformation_technique('paper-tqhd', acc_ref, emg_all=True)
+    losses_tqhd = _parse_transformation_technique('tqhd-q', acc_ref, emg_all=True)
     losses_pqhdc = _parse_transformation_technique('pqhdc', acc_ref, emg_all=True)
     losses_quanthdbin = _parse_transformation_technique('quanthdbin', acc_ref, emg_all=False)
 
@@ -1627,7 +1631,8 @@ def figure_noise():
         # Collapse the last dimension
         return losses
 
-    losses_tqhd = _parse_technique('paper-fault/tqhd', acc_ref, emg_all=True)
+    #losses_tqhd = _parse_technique('paper-fault/tqhd', acc_ref, emg_all=True)
+    losses_tqhd = _parse_technique('paper-fault/tqhd-q', acc_ref, emg_all=True)
     losses_pqhdc = _parse_technique('paper-fault/pqhdc', acc_ref, emg_all=True)
 
     start = 1
@@ -1651,8 +1656,8 @@ def figure_noise():
     plot_tqhd_vs_pqhdc(*a, **kw, path='_plots/noise.png')
 
 def main():
-    figure_normal_distribution()
-    figure_error_deviation()
+    #figure_normal_distribution()
+    #figure_error_deviation()
     figure_tqhd_vs_all()
     figure_noise()
 
